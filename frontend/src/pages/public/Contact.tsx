@@ -1,0 +1,168 @@
+import { useState } from 'react';
+import { useSelector } from 'react-redux';
+import { Mail, Phone, MessageSquare, Send, CheckCircle2, Clock } from 'lucide-react';
+
+export default function Contact() {
+  const { user } = useSelector((state: any) => state.auth);
+  
+  const [name, setName] = useState(user ? `${user.firstName || user.name || ''}` : '');
+  const [email, setEmail] = useState(user ? user.email : '');
+  const [company, setCompany] = useState(user?.companyName || '');
+  const [inquiryType, setInquiryType] = useState('Product Demo & Sales');
+  const [message, setMessage] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitted(true);
+    setTimeout(() => {
+      setMessage('');
+      setSubmitted(false);
+    }, 5000);
+  };
+
+  return (
+    <div className="w-full min-h-screen bg-white text-black font-sans selection:bg-red-600 selection:text-white py-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+      <div className="max-w-6xl mx-auto space-y-16 relative z-10">
+        
+        {/* Header */}
+        <div className="text-center max-w-3xl mx-auto space-y-4">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-50 border border-red-200 text-red-600 text-xs font-bold uppercase tracking-wider">
+            <MessageSquare className="w-3.5 h-3.5 text-red-600" />
+            <span>24/7 Creator & Enterprise Support</span>
+          </div>
+
+          <h1 className="text-4xl sm:text-6xl font-black text-black font-display tracking-tight leading-tight">
+            Let's Talk <span className="text-red-600">Ad Performance</span>
+          </h1>
+
+          <p className="text-zinc-600 text-base max-w-xl mx-auto leading-relaxed">
+            Have questions about custom rendering pipelines, high-volume API quotas, or done-for-you campaigns? Our team responds within 2 hours.
+          </p>
+        </div>
+
+        {/* Contact Method Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white p-6 rounded-3xl border border-zinc-200 space-y-3 hover:border-red-600 shadow-sm transition-all">
+            <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
+              <Mail className="w-5 h-5" />
+            </div>
+            <h3 className="text-lg font-bold text-black font-display">Sales & Demos</h3>
+            <p className="text-xs text-zinc-500 font-medium">Discuss custom quotas, enterprise SLAs, and agency onboarding.</p>
+            <a href="mailto:sales@adhunter.ai" className="text-xs font-bold text-red-600 hover:underline block pt-2">sales@adhunter.ai →</a>
+          </div>
+
+          <div className="bg-white p-6 rounded-3xl border border-zinc-200 space-y-3 hover:border-red-600 shadow-sm transition-all">
+            <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
+              <Clock className="w-5 h-5" />
+            </div>
+            <h3 className="text-lg font-bold text-black font-display">Technical Support</h3>
+            <p className="text-xs text-zinc-500 font-medium">Help with Meta/TikTok Graph API tokens, webhook setups, and pixel sync.</p>
+            <a href="mailto:support@adhunter.ai" className="text-xs font-bold text-red-600 hover:underline block pt-2">support@adhunter.ai →</a>
+          </div>
+
+          <div className="bg-white p-6 rounded-3xl border border-zinc-200 space-y-3 hover:border-red-600 shadow-sm transition-all">
+            <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
+              <Phone className="w-5 h-5" />
+            </div>
+            <h3 className="text-lg font-bold text-black font-display">Direct WhatsApp</h3>
+            <p className="text-xs text-zinc-500 font-medium">Instant VIP messaging for active enterprise and agency subscribers.</p>
+            <span className="text-xs font-bold text-red-600 block pt-2">+1 (800) 423-4868</span>
+          </div>
+        </div>
+
+        {/* Main Form Box */}
+        <div className="bg-zinc-50 rounded-3xl border border-zinc-200 p-8 sm:p-12 shadow-sm max-w-3xl mx-auto">
+          {submitted ? (
+            <div className="text-center py-12 space-y-4 animate-in zoom-in-95">
+              <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto shadow-sm">
+                <CheckCircle2 className="w-8 h-8" />
+              </div>
+              <h3 className="text-3xl font-black text-black font-display">Message Dispatched!</h3>
+              <p className="text-zinc-600 text-sm max-w-md mx-auto">
+                Thank you for reaching out. A dedicated growth specialist has been assigned to your inquiry and will respond to <span className="text-red-600 font-bold">{email}</span> within 2 hours.
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-zinc-600">Your Name *</label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={name} 
+                    onChange={e => setName(e.target.value)}
+                    placeholder="e.g. Alex Morgan"
+                    className="w-full px-4 py-3.5 bg-white border border-zinc-300 rounded-xl font-bold text-black focus:border-red-600 focus:outline-none transition-all text-xs" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-zinc-600">Work Email *</label>
+                  <input 
+                    type="email" 
+                    required 
+                    value={email} 
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="alex@company.com"
+                    className="w-full px-4 py-3.5 bg-white border border-zinc-300 rounded-xl font-bold text-black focus:border-red-600 focus:outline-none transition-all text-xs" 
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-zinc-600">Company Name</label>
+                  <input 
+                    type="text" 
+                    value={company} 
+                    onChange={e => setCompany(e.target.value)}
+                    placeholder="Acme Global Inc"
+                    className="w-full px-4 py-3.5 bg-white border border-zinc-300 rounded-xl font-bold text-black focus:border-red-600 focus:outline-none transition-all text-xs" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-zinc-600">Inquiry Topic</label>
+                  <select 
+                    value={inquiryType} 
+                    onChange={e => setInquiryType(e.target.value)}
+                    className="w-full px-4 py-3.5 bg-white border border-zinc-300 rounded-xl font-bold text-black focus:border-red-600 focus:outline-none transition-all text-xs"
+                  >
+                    <option value="Product Demo & Sales">Product Demo & Sales</option>
+                    <option value="Done-For-You Agency Service">Done-For-You Agency Service</option>
+                    <option value="B2B SaaS Platform Upgrade">B2B SaaS Platform Upgrade</option>
+                    <option value="Enterprise Custom Integration">Enterprise Custom Integration</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-zinc-600">How can we help? *</label>
+                <textarea 
+                  required 
+                  value={message} 
+                  onChange={e => setMessage(e.target.value)} 
+                  rows={4}
+                  placeholder="Describe your current ad creation volume, target ad networks, or questions..."
+                  className="w-full px-4 py-3.5 bg-white border border-zinc-300 rounded-xl font-bold text-black focus:border-red-600 focus:outline-none transition-all text-xs resize-none"
+                ></textarea>
+              </div>
+
+              <button 
+                type="submit" 
+                className="btn-shimmer w-full sm:w-auto px-10 py-4 bg-red-600 hover:bg-red-700 text-white font-extrabold uppercase tracking-wider rounded-xl shadow-md shadow-red-600/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 text-xs"
+              >
+                <Send className="w-4 h-4" />
+                <span>Transmit Inquiry</span>
+              </button>
+            </form>
+          )}
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
+
+
