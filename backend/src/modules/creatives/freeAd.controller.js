@@ -3,9 +3,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateFreeAd = exports.getFreeAdStatus = void 0;
+exports.getPublicShowcaseAds = exports.generateFreeAd = exports.getFreeAdStatus = void 0;
 const user_model_1 = __importDefault(require("../users/user.model"));
 const freeAd_model_1 = __importDefault(require("./freeAd.model"));
+const b2cRequest_model_1 = __importDefault(require("./b2cRequest.model"));
 const AuditLog_1 = __importDefault(require("../admin/models/AuditLog"));
 const ai_service_1 = require("./ai.service");
 const getFreeAdStatus = async (req, res) => {
@@ -158,4 +159,50 @@ const generateFreeAd = async (req, res) => {
     }
 };
 exports.generateFreeAd = generateFreeAd;
+const getPublicShowcaseAds = async (req, res) => {
+    try {
+        const freeAds = await freeAd_model_1.default.find({}).sort({ createdAt: -1 });
+        const b2cRequests = await b2cRequest_model_1.default.find({}).sort({ createdAt: -1 });
+        const b2cItems = [];
+        for (const b2cReq of b2cRequests) {
+            if (b2cReq.creativeAssets && b2cReq.creativeAssets.length > 0) {
+                for (const asset of b2cReq.creativeAssets) {
+                    b2cItems.push({
+                        id: `${b2cReq._id}-${asset.version}`,
+                        title: asset.headline || b2cReq.productName,
+                        category: b2cReq.category || 'General',
+                        url: asset.url,
+                        leads: String(Math.floor(100 + Math.random() * 500)),
+                        roas: `${(2.5 + Math.random() * 4).toFixed(1)}x`,
+                        ctr: `${(1.5 + Math.random() * 5).toFixed(1)}%`,
+                        platform: b2cReq.format || 'Instagram Post (1:1)',
+                        hook: asset.primaryText || b2cReq.description,
+                        cta: asset.cta || 'Shop Now'
+                    });
+                }
+            }
+        }
+        const freeAdItems = freeAds.map(ad => ({
+            id: ad._id.toString(),
+            title: ad.generatedResult?.headline || ad.productName,
+            category: ad.category || 'General',
+            url: ad.generatedResult?.generatedVisualUrl || (ad.mediaAssets && ad.mediaAssets[0]?.url) || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&fit=crop',
+            leads: String(Math.floor(50 + Math.random() * 200)),
+            roas: `${(1.8 + Math.random() * 3).toFixed(1)}x`,
+            ctr: `${(1.2 + Math.random() * 4).toFixed(1)}%`,
+            platform: 'AI Free Ad',
+            hook: ad.generatedResult?.socialCaption || ad.productDescription || '',
+            cta: ad.cta || 'Learn More'
+        }));
+        res.json({
+            success: true,
+            data: [...b2cItems, ...freeAdItems]
+        });
+    }
+    catch (error) {
+        console.error('getPublicShowcaseAds error:', error);
+        res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
+    }
+};
+exports.getPublicShowcaseAds = getPublicShowcaseAds;
 //# sourceMappingURL=freeAd.controller.js.map

@@ -17,6 +17,7 @@ export interface IGeneratedAdResult {
   socialCaption: string;
   targetAudienceSuggestions: string[];
   videoScript?: string;
+  generatedVisualUrl?: string;
   provider: string;
   generatedAt: Date;
 }

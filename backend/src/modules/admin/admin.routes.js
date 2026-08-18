@@ -43,8 +43,10 @@ router.use(tenant_middleware_1.requireAuth);
 router.get('/dashboard', (0, tenant_middleware_1.requirePermission)('ANALYTICS_VIEW'), adminController.getDashboardStats);
 // B2C Customer Management
 router.get('/b2c/customers', (0, tenant_middleware_1.requirePermission)('CUSTOMERS_VIEW'), adminController.getB2CCustomers);
+router.post('/b2c/customers', (0, tenant_middleware_1.requirePermission)('CUSTOMERS_VIEW'), adminController.createB2CCustomer);
 // B2B Business Management
 router.get('/b2b/businesses', (0, tenant_middleware_1.requirePermission)('CUSTOMERS_VIEW'), adminController.getB2BBusinesses);
+router.post('/b2b/businesses', (0, tenant_middleware_1.requirePermission)('CUSTOMERS_VIEW'), adminController.createB2BBusiness);
 // Employee Management
 router.post('/employees', adminController.createEmployee);
 router.get('/employees', adminController.getEmployees);

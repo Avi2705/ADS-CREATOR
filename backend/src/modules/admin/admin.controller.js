@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.convertLeadToCustomer = exports.assignLeadToEmployee = exports.getEmployees = exports.createEmployee = exports.getB2BBusinesses = exports.getB2CCustomers = exports.getDashboardStats = void 0;
+exports.convertLeadToCustomer = exports.assignLeadToEmployee = exports.getEmployees = exports.createEmployee = exports.createB2BBusiness = exports.getB2BBusinesses = exports.createB2CCustomer = exports.getB2CCustomers = exports.getDashboardStats = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const user_model_1 = __importDefault(require("../users/user.model"));
 const lead_model_1 = __importDefault(require("../leads/lead.model"));
@@ -43,6 +43,42 @@ const getB2CCustomers = async (req, res) => {
     }
 };
 exports.getB2CCustomers = getB2CCustomers;
+const createB2CCustomer = async (req, res) => {
+    try {
+        const { name, email, password, subscription, mobile } = req.body;
+        if (!name || !email || !password) {
+            return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
+        }
+        const existingUser = await user_model_1.default.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ success: false, message: 'An account with this email already exists' });
+        }
+        const passwordHash = await bcrypt_1.default.hash(password, 10);
+        const referenceId = `CUST-REF-${Math.floor(100000 + Math.random() * 900000)}`;
+        const newCustomer = await user_model_1.default.create({
+            referenceId,
+            name,
+            email,
+            passwordHash,
+            accountType: 'B2C',
+            role: 'CUSTOMER',
+            status: 'ACTIVE',
+            paymentStatus: 'PAID',
+            subscription: subscription || 'B2C Growth',
+            mobile: mobile || '',
+            profileStatus: 'COMPLETED'
+        });
+        res.status(201).json({
+            success: true,
+            message: 'B2C Customer account created successfully',
+            customer: newCustomer
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message || 'Failed to create B2C customer' });
+    }
+};
+exports.createB2CCustomer = createB2CCustomer;
 const getB2BBusinesses = async (req, res) => {
     try {
         const businesses = await user_model_1.default.find({ accountType: 'B2B' }).select('-passwordHash');
@@ -53,6 +89,42 @@ const getB2BBusinesses = async (req, res) => {
     }
 };
 exports.getB2BBusinesses = getB2BBusinesses;
+const createB2BBusiness = async (req, res) => {
+    try {
+        const { companyName, ownerName, email, password, subscription } = req.body;
+        if (!companyName || !ownerName || !email || !password) {
+            return res.status(400).json({ success: false, message: 'Company name, owner name, email, and password are required' });
+        }
+        const existingUser = await user_model_1.default.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ success: false, message: 'An account with this email already exists' });
+        }
+        const passwordHash = await bcrypt_1.default.hash(password, 10);
+        const referenceId = `BUS-REF-${Math.floor(100000 + Math.random() * 900000)}`;
+        const newBusiness = await user_model_1.default.create({
+            referenceId,
+            name: ownerName,
+            email,
+            passwordHash,
+            accountType: 'B2B',
+            role: 'BUSINESS_OWNER',
+            status: 'ACTIVE',
+            paymentStatus: 'PAID',
+            subscription: subscription || 'Pro',
+            companyName,
+            profileStatus: 'COMPLETED'
+        });
+        res.status(201).json({
+            success: true,
+            message: 'B2B Business account created successfully',
+            business: newBusiness
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message || 'Failed to create B2B business' });
+    }
+};
+exports.createB2BBusiness = createB2BBusiness;
 // ==========================================
 // EMPLOYEE MANAGEMENT CONTROLLERS
 // ==========================================

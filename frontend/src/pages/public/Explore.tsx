@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles, ArrowRight, TrendingUp, X, Filter } from 'lucide-react';
 
@@ -18,119 +18,22 @@ interface CreativeItem {
 export default function Explore() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedAd, setSelectedAd] = useState<CreativeItem | null>(null);
+  const [creatives, setCreatives] = useState<CreativeItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const creatives: CreativeItem[] = [
-    {
-      id: '1',
-      title: "Nike Velocity React Pro",
-      category: "Footwear",
-      url: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&fit=crop",
-      leads: "4,820",
-      roas: "5.4x",
-      ctr: "4.8%",
-      platform: "Instagram Feed (1:1)",
-      hook: "Stop scrolling: The lightest runner of 2026 just dropped.",
-      cta: "Shop The Drop"
-    },
-    {
-      id: '2',
-      title: "Audi RS Performance GT",
-      category: "Automotive",
-      url: "https://images.unsplash.com/photo-1603584173870-7f23fdae1b7a?w=600&fit=crop",
-      leads: "2,150",
-      roas: "6.1x",
-      ctr: "3.9%",
-      platform: "YouTube Bumper (16:9)",
-      hook: "0 to 100 in 2.9 seconds. Pure German engineering unleashed.",
-      cta: "Book VIP Test Drive"
-    },
-    {
-      id: '3',
-      title: "Apple Watch Ultra Chrono",
-      category: "Tech",
-      url: "https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=600&fit=crop",
-      leads: "14,900",
-      roas: "4.9x",
-      ctr: "5.2%",
-      platform: "TikTok Hook (9:16)",
-      hook: "Titanium casing. 72-hour battery. Ready for Everest.",
-      cta: "Order Now - Free Express Shipping"
-    },
-    {
-      id: '4',
-      title: "Ferrari Monza Speciale",
-      category: "Automotive",
-      url: "https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=600&fit=crop",
-      leads: "980",
-      roas: "8.2x",
-      ctr: "6.4%",
-      platform: "Meta Stories (9:16)",
-      hook: "Only 499 units worldwide. Experience the pinnacle of speed.",
-      cta: "Request Allocation"
-    },
-    {
-      id: '5',
-      title: "Nike Air Jordan Retro High",
-      category: "Footwear",
-      url: "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?w=600&fit=crop",
-      leads: "9,450",
-      roas: "4.7x",
-      ctr: "4.1%",
-      platform: "TikTok Viral (9:16)",
-      hook: "The classic silhouette rebuilt with modern air cushioning.",
-      cta: "Claim Your Pair"
-    },
-    {
-      id: '6',
-      title: "Dior Sauvage Elixir",
-      category: "Cosmetics",
-      url: "https://images.unsplash.com/photo-1584916201218-f4242ceb4809?w=600&fit=crop",
-      leads: "3,890",
-      roas: "5.8x",
-      ctr: "4.6%",
-      platform: "Instagram Reel (9:16)",
-      hook: "An intoxicating night trail crafted for those who command attention.",
-      cta: "Discover The Scent"
-    },
-    {
-      id: '7',
-      title: "Sony WH-1000XM5 Studio",
-      category: "Tech",
-      url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&fit=crop",
-      leads: "6,200",
-      roas: "5.1x",
-      ctr: "3.8%",
-      platform: "Meta Carousel (1:1)",
-      hook: "Industry-leading noise cancellation. Silence the chaos.",
-      cta: "Get 20% Off Today"
-    },
-    {
-      id: '8',
-      title: "Bespoke Italian Leather Jacket",
-      category: "Fashion",
-      url: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600&fit=crop",
-      leads: "1,840",
-      roas: "4.2x",
-      ctr: "3.5%",
-      platform: "Instagram Feed (1:1)",
-      hook: "Handcrafted in Florence. Full-grain leather that ages with character.",
-      cta: "Explore Collection"
-    },
-    {
-      id: '9',
-      title: "Polaroid Vintage Creator Edition",
-      category: "Tech",
-      url: "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&fit=crop",
-      leads: "5,300",
-      roas: "4.5x",
-      ctr: "4.9%",
-      platform: "TikTok Spark (9:16)",
-      hook: "Analog vibes in a digital world. Print instant nostalgia.",
-      cta: "Shop Creator Bundle"
-    }
-  ];
+  useEffect(() => {
+    fetch('http://localhost:3000/api/ai/free-ad/public-showcase')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.data)) {
+          setCreatives(data.data);
+        }
+      })
+      .catch(err => console.error("Failed to fetch public database ads:", err))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const categories = ['All', 'Footwear', 'Tech', 'Automotive', 'Cosmetics', 'Fashion'];
+  const categories = ['All', ...Array.from(new Set(creatives.map(c => c.category).filter(Boolean)))];
 
   const filteredCreatives = selectedCategory === 'All' 
     ? creatives 
@@ -200,59 +103,74 @@ export default function Explore() {
           </div>
 
           {/* Ad Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredCreatives.map((ad) => (
-              <div
-                key={ad.id}
-                onClick={() => setSelectedAd(ad)}
-                className="bg-white rounded-3xl overflow-hidden border border-zinc-200 hover:border-red-600 shadow-sm hover:shadow-md transition-all duration-300 group cursor-pointer flex flex-col"
-              >
-                {/* Media Aspect Container */}
-                <div className="aspect-[4/5] bg-zinc-100 relative overflow-hidden">
-                  <img
-                    src={ad.url}
-                    alt={ad.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-between p-6">
-                    <div className="flex justify-between items-start">
-                      <span className="px-3 py-1 rounded-full bg-red-600 text-white text-[10px] font-black uppercase tracking-wider shadow-sm">
-                        {ad.category}
-                      </span>
-                      <span className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-white border border-white/20">
-                        {ad.platform}
-                      </span>
-                    </div>
+          {loading ? (
+            <div className="py-20 flex flex-col items-center justify-center space-y-4">
+              <div className="w-12 h-12 rounded-full border-4 border-zinc-200 border-t-red-600 animate-spin" />
+              <div className="text-zinc-500 font-bold text-xs uppercase tracking-wider">Syncing database showcase ads...</div>
+            </div>
+          ) : filteredCreatives.length === 0 ? (
+            <div className="py-20 border-2 border-dashed border-zinc-200 rounded-3xl text-center space-y-4">
+              <div className="text-zinc-400 text-4xl">📭</div>
+              <div className="space-y-1">
+                <h3 className="font-black text-black text-sm uppercase tracking-wider">No ads in showcase</h3>
+                <p className="text-xs text-zinc-500 font-medium">Any free ads generated by explorers or B2C portal creatives will appear here automatically.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredCreatives.map((ad) => (
+                <div
+                  key={ad.id}
+                  onClick={() => setSelectedAd(ad)}
+                  className="bg-white rounded-3xl overflow-hidden border border-zinc-200 hover:border-red-600 shadow-sm hover:shadow-md transition-all duration-300 group cursor-pointer flex flex-col"
+                >
+                  {/* Media Aspect Container */}
+                  <div className="aspect-[4/5] bg-zinc-100 relative overflow-hidden">
+                    <img
+                      src={ad.url}
+                      alt={ad.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-between p-6">
+                      <div className="flex justify-between items-start">
+                        <span className="px-3 py-1 rounded-full bg-red-600 text-white text-[10px] font-black uppercase tracking-wider shadow-sm">
+                          {ad.category}
+                        </span>
+                        <span className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-white border border-white/20">
+                          {ad.platform}
+                        </span>
+                      </div>
 
-                    <div className="space-y-2">
-                      <h3 className="text-xl font-bold text-white leading-tight font-display drop-shadow-md">
-                        {ad.title}
-                      </h3>
-                      <div className="flex items-center gap-4 text-xs">
-                        <span className="text-red-400 font-black flex items-center gap-1">
-                          <TrendingUp className="w-3.5 h-3.5" /> {ad.roas} ROAS
-                        </span>
-                        <span className="text-white font-semibold">
-                          {ad.leads} Leads
-                        </span>
-                        <span className="text-white font-semibold">
-                          {ad.ctr} CTR
-                        </span>
+                      <div className="space-y-2">
+                        <h3 className="text-xl font-bold text-white leading-tight font-display drop-shadow-md">
+                          {ad.title}
+                        </h3>
+                        <div className="flex items-center gap-4 text-xs">
+                          <span className="text-red-400 font-black flex items-center gap-1">
+                            <TrendingUp className="w-3.5 h-3.5" /> {ad.roas} ROAS
+                          </span>
+                          <span className="text-white font-semibold">
+                            {ad.leads} Leads
+                          </span>
+                          <span className="text-white font-semibold">
+                            {ad.ctr} CTR
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Card Bottom Strip */}
-                <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between text-xs">
-                  <span className="text-zinc-600 truncate max-w-[200px] font-medium">"{ad.hook}"</span>
-                  <span className="font-bold text-red-600 group-hover:translate-x-1 transition-transform flex items-center gap-1 shrink-0">
-                    Inspect Formula →
-                  </span>
+                  {/* Card Bottom Strip */}
+                  <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between text-xs">
+                    <span className="text-zinc-600 truncate max-w-[200px] font-medium">"{ad.hook}"</span>
+                    <span className="font-bold text-red-600 group-hover:translate-x-1 transition-transform flex items-center gap-1 shrink-0">
+                      Inspect Formula →
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
         </div>
       </section>

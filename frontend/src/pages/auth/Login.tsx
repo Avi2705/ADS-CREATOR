@@ -48,6 +48,23 @@ export default function Login() {
         return;
       }
 
+      // Try real backend login first
+      try {
+        const backendRes = await fetch('http://localhost:3000/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const backendData = await backendRes.json();
+        if (backendRes.ok && backendData.token) {
+          dispatch(setCredentials({ user: backendData.user, token: backendData.token }));
+          redirectUser(backendData.user);
+          return;
+        }
+      } catch (err) {
+        console.warn("Backend auth failed or unreachable; falling back to local simulation.", err);
+      }
+
       // Check localStorage for custom registered accounts or employee accounts
       const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
       const matchedUser = mockUsers.find((u: any) => u.email === email && u.password === password);

@@ -12,9 +12,11 @@ router.get('/dashboard', requirePermission('ANALYTICS_VIEW'), adminController.ge
 
 // B2C Customer Management
 router.get('/b2c/customers', requirePermission('CUSTOMERS_VIEW'), adminController.getB2CCustomers);
+router.post('/b2c/customers', requirePermission('CUSTOMERS_VIEW'), adminController.createB2CCustomer);
 
 // B2B Business Management
 router.get('/b2b/businesses', requirePermission('CUSTOMERS_VIEW'), adminController.getB2BBusinesses);
+router.post('/b2b/businesses', requirePermission('CUSTOMERS_VIEW'), adminController.createB2BBusiness);
 
 // Employee Management
 router.post('/employees', adminController.createEmployee);

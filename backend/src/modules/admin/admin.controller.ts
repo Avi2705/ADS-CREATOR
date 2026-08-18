@@ -41,12 +41,90 @@ export const getB2CCustomers = async (req: Request, res: Response) => {
   }
 };
 
+export const createB2CCustomer = async (req: Request, res: Response) => {
+  try {
+    const { name, email, password, subscription, mobile } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: 'An account with this email already exists' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const referenceId = `CUST-REF-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const newCustomer = await User.create({
+      referenceId,
+      name,
+      email,
+      passwordHash,
+      accountType: 'B2C',
+      role: 'CUSTOMER',
+      status: 'ACTIVE',
+      paymentStatus: 'PAID',
+      subscription: subscription || 'B2C Growth',
+      mobile: mobile || '',
+      profileStatus: 'COMPLETED'
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'B2C Customer account created successfully',
+      customer: newCustomer
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message || 'Failed to create B2C customer' });
+  }
+};
+
 export const getB2BBusinesses = async (req: Request, res: Response) => {
   try {
     const businesses = await User.find({ accountType: 'B2B' }).select('-passwordHash');
     res.json({ success: true, data: businesses });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch B2B businesses' });
+  }
+};
+
+export const createB2BBusiness = async (req: Request, res: Response) => {
+  try {
+    const { companyName, ownerName, email, password, subscription } = req.body;
+    if (!companyName || !ownerName || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Company name, owner name, email, and password are required' });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: 'An account with this email already exists' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const referenceId = `BUS-REF-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const newBusiness = await User.create({
+      referenceId,
+      name: ownerName,
+      email,
+      passwordHash,
+      accountType: 'B2B',
+      role: 'BUSINESS_OWNER',
+      status: 'ACTIVE',
+      paymentStatus: 'PAID',
+      subscription: subscription || 'Pro',
+      companyName,
+      profileStatus: 'COMPLETED'
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'B2B Business account created successfully',
+      business: newBusiness
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message || 'Failed to create B2B business' });
   }
 };
 

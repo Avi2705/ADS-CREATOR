@@ -3,7 +3,9 @@ import {
   connectAccount,
   disconnectAccount,
   getConnectedAccounts,
-  publishPost
+  publishPost,
+  getSocialPosts,
+  deleteSocialPost
 } from './social.controller';
 
 const router = Router();
@@ -15,5 +17,9 @@ router.get('/accounts/:userId', getConnectedAccounts);
 
 // Dispatch a post to one or more connected platforms
 router.post('/publish', publishPost);
+
+// Social posts database routes
+router.get('/posts', getSocialPosts);
+router.delete('/posts/:postId', deleteSocialPost);
 
 export default router;

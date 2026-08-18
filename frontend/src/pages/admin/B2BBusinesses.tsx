@@ -27,67 +27,80 @@ export default function B2BBusinesses() {
   const [password, setPassword] = useState('');
   const [subPlan, setSubPlan] = useState('Pro');
 
+  const [loading, setLoading] = useState(true);
+
   // Load registered/created users
   useEffect(() => {
-    const localUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    const localB2B = localUsers
-      .filter((u: any) => u.role === 'BUSINESS_OWNER')
-      .map((u: any) => ({
-        id: u._id,
-        company: u.companyName || 'SaaS Company',
-        owner: `${u.firstName} ${u.lastName}`,
-        email: u.email,
-        users: 1,
-        products: 1,
-        ads: 0,
-        videos: 0,
-        leads: 0,
-        sub: 'Pro',
-        status: 'Active'
-      }));
-    setBusinesses(localB2B);
+    const token = localStorage.getItem('auth_token') || 'mock-jwt-admin-token';
+    setLoading(true);
+    fetch('http://localhost:3000/api/v1/admin/b2b/businesses', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.data)) {
+          const list = data.data.map((u: any) => ({
+            id: u._id,
+            company: u.companyName || 'SaaS Company',
+            owner: u.name || 'B2B Client',
+            email: u.email,
+            users: 1,
+            products: u.numProducts || 0,
+            ads: u.adsCount || 0,
+            videos: u.videosCount || 0,
+            leads: u.leadsCount || 0,
+            sub: u.subscription || 'Pro',
+            status: u.status || 'Active'
+          }));
+          setBusinesses(list);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to load database B2B businesses:", err);
+      })
+      .finally(() => setLoading(false));
   }, [isModalOpen]);
 
-  const handleAddBusiness = (e: React.FormEvent) => {
+  const handleAddBusiness = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!company || !owner || !email || !password) return;
 
-    // Save to localStorage so they can sign in with this account
-    const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    
-    // Check user limits based on Plan selection
-    let maxAllowedUsers = 2; // Default for Starter
-    if (subPlan === 'Pro') maxAllowedUsers = 4;
-    else if (subPlan === 'Enterprise') maxAllowedUsers = 6;
+    const token = localStorage.getItem('auth_token') || 'mock-jwt-admin-token';
 
-    // Simulate counting users in this business tenant
-    const existingTenantUsers = mockUsers.filter((u: any) => u.companyName === company).length;
-    if (existingTenantUsers >= maxAllowedUsers) {
-      alert(`Security Violation: This business is on the ${subPlan} plan and has reached its maximum user limit of ${maxAllowedUsers} accounts.`);
-      return;
+    try {
+      const res = await fetch('http://localhost:3000/api/v1/admin/b2b/businesses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          companyName: company,
+          ownerName: owner,
+          email,
+          password,
+          subscription: subPlan
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to save business');
+      }
+
+      setCompany('');
+      setOwner('');
+      setEmail('');
+      setPassword('');
+      setSubPlan('Pro');
+      setIsModalOpen(false);
+
+      alert(`✅ B2B Business account provisioned in database!\nReference ID: ${data.business.referenceId}`);
+    } catch (err: any) {
+      alert(`⚠️ Failed to create business in database: ${err.message}`);
     }
-
-    const newUser = {
-      _id: `b2b-${Date.now()}`,
-      email,
-      password,
-      firstName: owner.split(' ')[0] || 'Business',
-      lastName: owner.split(' ')[1] || 'Owner',
-      role: 'BUSINESS_OWNER',
-      tenantId: `tenant-${Date.now()}`,
-      companyName: company
-    };
-
-    mockUsers.push(newUser);
-    localStorage.setItem('mock_users', JSON.stringify(mockUsers));
-
-    // Reset Form
-    setCompany('');
-    setOwner('');
-    setEmail('');
-    setPassword('');
-    setSubPlan('Pro');
-    setIsModalOpen(false);
   };
 
   const filteredBusinesses = businesses.filter(b => {
@@ -238,45 +251,52 @@ export default function B2BBusinesses() {
               </tr>
             </thead>
             <tbody className="text-gray-900 text-sm font-medium">
-              {filteredBusinesses.map((b) => (
-                <tr key={b.id} className="border-b border-gray-50 hover:bg-gray-50/80 transition-colors">
-                  <td className="p-4">
-                    <div className="font-black text-base text-gray-900">{b.company}</div>
-                    <div className="text-gray-500 text-xs">{b.owner} • {b.email}</div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex gap-3">
-                      <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md font-bold" title="Users">{b.users} Usr</span>
-                      <span className="bg-purple-50 text-purple-700 px-2 py-1 rounded-md font-bold" title="Products">{b.products} Prd</span>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex gap-3">
-                      <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-md font-bold">{b.ads} Ads</span>
-                      <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-md font-bold">{b.videos} Vid</span>
-                    </div>
-                  </td>
-                  <td className="p-4 font-black text-gray-700">{b.leads.toLocaleString()}</td>
-                  <td className="p-4">
-                    <div className="font-bold text-gray-900 mb-1">{b.sub}</div>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                      b.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {b.status}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right">
-                    <button className="text-gray-900 font-bold hover:underline mr-4">Manage Tenant</button>
-                    <button className="text-primary font-bold hover:underline">Login As</button>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-gray-500 font-bold">
+                    Loading SaaS tenants list...
                   </td>
                 </tr>
-              ))}
-              {filteredBusinesses.length === 0 && (
+              ) : filteredBusinesses.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-gray-500 font-medium">
                     No businesses found matching your criteria.
                   </td>
                 </tr>
+              ) : (
+                filteredBusinesses.map((b) => (
+                  <tr key={b.id} className="border-b border-gray-50 hover:bg-gray-50/80 transition-colors">
+                    <td className="p-4">
+                      <div className="font-black text-base text-gray-900">{b.company}</div>
+                      <div className="text-gray-500 text-xs">{b.owner} • {b.email}</div>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex gap-3">
+                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md font-bold" title="Users">{b.users} Usr</span>
+                        <span className="bg-purple-50 text-purple-700 px-2 py-1 rounded-md font-bold" title="Products">{b.products} Prd</span>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex gap-3">
+                        <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-md font-bold">{b.ads} Ads</span>
+                        <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-md font-bold">{b.videos} Vid</span>
+                      </div>
+                    </td>
+                    <td className="p-4 font-black text-gray-700">{b.leads.toLocaleString()}</td>
+                    <td className="p-4">
+                      <div className="font-bold text-gray-900 mb-1">{b.sub}</div>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        b.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {b.status}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right">
+                      <button className="text-gray-900 font-bold hover:underline mr-4">Manage Tenant</button>
+                      <button className="text-primary font-bold hover:underline">Login As</button>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>

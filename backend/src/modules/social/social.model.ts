@@ -26,3 +26,41 @@ const SocialAccountSchema = new Schema<ISocialAccount>({
 SocialAccountSchema.index({ userId: 1, platform: 1 }, { unique: true });
 
 export default mongoose.model<ISocialAccount>('SocialAccount', SocialAccountSchema);
+
+export interface ISocialPost extends Document {
+  userId: string;
+  adId?: string;
+  headline: string;
+  caption: string;
+  mediaUrl: string;
+  mediaType: 'IMAGE' | 'VIDEO';
+  channels: string[];
+  targetUrl: string;
+  status: 'PUBLISHED' | 'SCHEDULED';
+  scheduledDate?: string;
+  publishedDate: string;
+  impressions: number;
+  clicks: number;
+  leads: number;
+  createdAt: Date;
+}
+
+const SocialPostSchema = new Schema<ISocialPost>({
+  userId: { type: String, required: true, index: true },
+  adId: { type: String },
+  headline: { type: String, required: true },
+  caption: { type: String },
+  mediaUrl: { type: String, required: true },
+  mediaType: { type: String, enum: ['IMAGE', 'VIDEO'], default: 'IMAGE' },
+  channels: [{ type: String }],
+  targetUrl: { type: String },
+  status: { type: String, enum: ['PUBLISHED', 'SCHEDULED'], default: 'PUBLISHED' },
+  scheduledDate: { type: String },
+  publishedDate: { type: String, required: true },
+  impressions: { type: Number, default: 0 },
+  clicks: { type: Number, default: 0 },
+  leads: { type: Number, default: 0 },
+  createdAt: { type: Date, default: Date.now }
+});
+
+export const SocialPost = mongoose.model<ISocialPost>('SocialPost', SocialPostSchema);

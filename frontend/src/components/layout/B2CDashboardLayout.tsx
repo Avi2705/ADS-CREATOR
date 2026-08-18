@@ -30,7 +30,8 @@ interface AdRequest {
 }
 
 export interface B2CPost {
-  id: string;
+  id?: string;
+  _id?: string;
   adId?: string;
   headline: string;
   caption: string;
@@ -210,29 +211,19 @@ export default function B2CDashboardLayout() {
 
   // Load posts specific to this customer ONLY
   useEffect(() => {
-    if (!user) {
-      setPosts([]);
-      return;
-    }
-    const userKey = user._id || user.email || 'b2c-default';
-    const savedPosts = localStorage.getItem(`posts_${userKey}`);
-    if (savedPosts) {
-      try {
-        setPosts(JSON.parse(savedPosts));
-      } catch {
-        setPosts([]);
-      }
-    } else {
-      setPosts([]);
-    }
-  }, [user]);
-
-  const savePosts = (updated: B2CPost[]) => {
     if (!user) return;
     const userKey = user._id || user.email || 'b2c-default';
-    setPosts(updated);
-    localStorage.setItem(`posts_${userKey}`, JSON.stringify(updated));
-  };
+    fetch(`http://localhost:3000/api/social/posts?userId=${userKey}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.posts)) {
+          setPosts(data.posts);
+        }
+      })
+      .catch(err => console.error("Failed to load database posts:", err));
+  }, [user]);
+
+
 
   const handleOpenPostModal = (ad?: AdRequest) => {
     if (ad) {
@@ -336,85 +327,68 @@ export default function B2CDashboardLayout() {
     if (!postHeadline.trim()) { alert('Please provide a post headline.'); return; }
     if (postChannels.length === 0) { alert('Please select at least one social media channel.'); return; }
 
-    // Check if any selected channel has a connected account
-    const connectedChannels = postChannels.filter(ch =>
-      socialAccounts.some(a => a.platform === ch && a.isConnected)
-    );
-    const unconnectedChannels = postChannels.filter(ch =>
-      !socialAccounts.some(a => a.platform === ch && a.isConnected)
-    );
-
     const resolvedMediaUrl = postMediaUrl ||
       adRequests.find(r => r.creativeUrl)?.creativeUrl ||
       'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&fit=crop';
 
     let apiResults: Record<string, { success: boolean; postId?: string; error?: string }> = {};
 
-    // Call real API for connected channels
-    if (connectedChannels.length > 0 && postScheduleType === 'NOW') {
-      setIsPublishing(true);
-      try {
-        const res = await fetch('http://localhost:3000/api/social/publish', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: user._id || user.email,
-            channels: connectedChannels,
-            headline: postHeadline,
-            caption: postCaption,
-            mediaUrl: resolvedMediaUrl,
-            targetUrl: postTargetUrl
-          })
-        });
-        const data = await res.json();
-        apiResults = data.results || {};
-      } catch {
-        connectedChannels.forEach(ch => {
-          apiResults[ch] = { success: false, error: 'Backend unreachable — post queued locally.' };
-        });
-      } finally {
-        setIsPublishing(false);
+    setIsPublishing(true);
+    try {
+      const res = await fetch('http://localhost:3000/api/social/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user._id || user.email,
+          channels: postChannels,
+          headline: postHeadline,
+          caption: postCaption,
+          mediaUrl: resolvedMediaUrl,
+          targetUrl: postTargetUrl,
+          adId: selectedAdForPost?.id,
+          mediaType: postMediaType,
+          status: postScheduleType === 'NOW' ? 'PUBLISHED' : 'SCHEDULED',
+          scheduledDate: postScheduleType === 'LATER' ? postScheduledDate : undefined
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Publish failed');
       }
+
+      if (data.post) {
+        setPosts(prev => [data.post, ...prev]);
+      }
+      apiResults = data.results || {};
+    } catch (err: any) {
+      console.error("Failed to publish B2C post:", err);
+      // Queue locally/mock results if backend fails
+      postChannels.forEach(ch => {
+        apiResults[ch] = { success: false, error: err.message || 'Publishing failed.' };
+      });
+    } finally {
+      setIsPublishing(false);
     }
 
-    // Unconnected channels get a local "queued" record
-    unconnectedChannels.forEach(ch => {
-      apiResults[ch] = { success: false, error: `No ${ch} account connected. Post queued — connect account in Social Accounts settings.` };
-    });
-
     setPublishResults(apiResults);
-
-    // Create local post record regardless
-    const newPost: B2CPost = {
-      id: `POST-${Date.now().toString().slice(-4)}`,
-      adId: selectedAdForPost?.id,
-      headline: postHeadline,
-      caption: postCaption,
-      mediaUrl: resolvedMediaUrl,
-      mediaType: postMediaType,
-      channels: postChannels,
-      targetUrl: postTargetUrl,
-      status: postScheduleType === 'NOW' ? 'PUBLISHED' : 'SCHEDULED',
-      scheduledDate: postScheduleType === 'LATER' ? postScheduledDate : undefined,
-      publishedDate: new Date().toISOString().split('T')[0],
-      impressions: postScheduleType === 'NOW' ? Math.floor(1800 + Math.random() * 5200) : 0,
-      clicks: postScheduleType === 'NOW' ? Math.floor(150 + Math.random() * 420) : 0,
-      leads: postScheduleType === 'NOW' ? Math.floor(12 + Math.random() * 38) : 0
-    };
-    savePosts([newPost, ...posts]);
 
     if (selectedAdForPost) {
       saveRequests(adRequests.map(r =>
         r.id === selectedAdForPost.id ? { ...r, status: 'PUBLISHED' as const } : r
       ));
     }
-
-    // Results panel will show instead of closing
   };
 
-  const handleDeletePost = (postId: string) => {
+  const handleDeletePost = async (postId: string) => {
     if (!confirm('Are you sure you want to remove this post record?')) return;
-    savePosts(posts.filter(p => p.id !== postId));
+    try {
+      await fetch(`http://localhost:3000/api/social/posts/${postId}`, {
+        method: 'DELETE'
+      });
+    } catch (err) {
+      console.warn("Failed to delete post from database:", err);
+    }
+    setPosts(prev => prev.filter(p => p.id !== postId && p._id !== postId));
   };
 
 
@@ -705,6 +679,7 @@ export default function B2CDashboardLayout() {
               { id: 'ads', label: 'My Ads & Videos', icon: Film },
               { id: 'posts', label: 'Platform Posts', icon: Share2 },
               { id: 'leads', label: 'Captured Leads', icon: Users },
+              { id: 'social', label: 'Social Accounts', icon: Link2 },
               { id: 'subscription', label: 'Subscription', icon: CreditCard },
               { id: 'profile', label: 'My Profile', icon: User }
             ].map((item) => {
@@ -1224,13 +1199,13 @@ export default function B2CDashboardLayout() {
               ))}
             </div>
 
-            {/* Posts Grid / Cards */}
+
             {posts.filter(p => selectedChannelFilter === 'ALL' || p.channels.includes(selectedChannelFilter)).length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {posts
                   .filter(p => selectedChannelFilter === 'ALL' || p.channels.includes(selectedChannelFilter))
                   .map(post => (
-                    <div key={post.id} className="bg-white rounded-3xl border border-zinc-200 overflow-hidden shadow-sm flex flex-col justify-between group">
+                    <div key={post._id || post.id} className="bg-white rounded-3xl border border-zinc-200 overflow-hidden shadow-sm flex flex-col justify-between group">
                       <div className="relative">
                         <img src={post.mediaUrl} alt={post.headline} className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" />
                         <div className="absolute top-3 left-3 flex gap-1.5 flex-wrap max-w-[80%]">
@@ -1251,7 +1226,7 @@ export default function B2CDashboardLayout() {
 
                       <div className="p-5 space-y-3">
                         <div>
-                          <span className="font-mono text-[9px] text-zinc-400 font-bold block">{post.id} • {post.publishedDate}</span>
+                          <span className="font-mono text-[9px] text-zinc-400 font-bold block">{(post._id || post.id || '').slice(-6)} • {post.publishedDate}</span>
                           <h4 className="font-black text-black text-sm mt-0.5 line-clamp-1">{post.headline}</h4>
                           <p className="text-xs text-zinc-500 font-medium line-clamp-2 mt-1 whitespace-pre-line leading-relaxed">
                             {post.caption}
@@ -1285,7 +1260,7 @@ export default function B2CDashboardLayout() {
                           </button>
 
                           <button
-                            onClick={() => handleDeletePost(post.id)}
+                            onClick={() => handleDeletePost(post._id || post.id || '')}
                             className="text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1297,7 +1272,7 @@ export default function B2CDashboardLayout() {
                   ))}
               </div>
             ) : (
-              <div className="p-12 text-center bg-zinc-50 border border-dashed border-zinc-300 rounded-3xl space-y-3">
+              <div className="p-12 bg-zinc-50 border border-dashed border-zinc-300 rounded-3xl text-center space-y-3">
                 <div className="w-12 h-12 rounded-2xl bg-white border border-zinc-200 flex items-center justify-center mx-auto shadow-sm">
                   <Share2 className="w-6 h-6 text-zinc-400" />
                 </div>
@@ -1337,8 +1312,8 @@ export default function B2CDashboardLayout() {
                 </thead>
                 <tbody className="divide-y divide-zinc-200 font-medium">
                   {posts.filter(p => p.leads > 0).map((post) => (
-                    <tr key={post.id}>
-                      <td className="p-4 font-mono font-bold text-red-600">INBOUND-LEAD-{post.id.slice(-4)}</td>
+                    <tr key={post._id || post.id}>
+                      <td className="p-4 font-mono font-bold text-red-600">INBOUND-LEAD-{(post._id || post.id || '').slice(-4)}</td>
                       <td className="p-4 font-bold text-black">{post.headline}</td>
                       <td className="p-4 font-semibold text-zinc-600">{post.channels.join(', ')}</td>
                       <td className="p-4"><span className="px-2.5 py-0.5 bg-green-50 text-green-700 font-bold rounded-full text-[10px]">VERIFIED LEAD</span></td>
@@ -1354,9 +1329,6 @@ export default function B2CDashboardLayout() {
           </div>
         )}
 
-
-
-        {/* 7. Subscription Details */}
         {activeView === 'subscription' && (
           <div className="max-w-md bg-white rounded-3xl p-8 border border-zinc-200 shadow-sm space-y-6">
             <h2 className="text-2xl font-black text-black font-display border-b border-zinc-100 pb-3">Subscription Details</h2>
@@ -1392,6 +1364,143 @@ export default function B2CDashboardLayout() {
             >
               Go to Full Profile Page
             </button>
+          </div>
+        )}
+
+        {/* 9. Social Accounts View */}
+        {activeView === 'social' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center pb-4 border-b border-zinc-100">
+              <div>
+                <h2 className="text-2xl font-black text-black font-display tracking-tight">Social Account Integrations</h2>
+                <p className="text-xs text-zinc-500 font-medium">Link your business social accounts to enable automated instant posting.</p>
+              </div>
+            </div>
+
+            {connectingPlatform ? (
+              <div className="max-w-xl bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm space-y-6">
+                <div className="flex justify-between items-center pb-3 border-b border-zinc-100">
+                  <h3 className="font-black text-black">Connect {connectingPlatform} Account</h3>
+                  <button 
+                    onClick={() => { setConnectingPlatform(null); setConnectHandle(''); setConnectAccountId(''); setConnectToken(''); }}
+                    className="text-xs font-bold text-zinc-500 hover:text-black uppercase"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                <form onSubmit={handleConnectAccount} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                      Account Handle / Username *
+                    </label>
+                    <input 
+                      type="text" 
+                      required 
+                      value={connectHandle}
+                      onChange={(e) => setConnectHandle(e.target.value)}
+                      placeholder="@yourbrand"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                      Business Account / Page ID *
+                    </label>
+                    <input 
+                      type="text" 
+                      required 
+                      value={connectAccountId}
+                      onChange={(e) => setConnectAccountId(e.target.value)}
+                      placeholder="e.g. 178414053..."
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                      API Access Token *
+                    </label>
+                    <textarea 
+                      required 
+                      value={connectToken}
+                      onChange={(e) => setConnectToken(e.target.value)}
+                      rows={3}
+                      placeholder="e.g. EAACW5..."
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-medium text-xs text-black focus:outline-none focus:border-red-600 resize-none leading-relaxed"
+                    />
+                    <p className="text-[10px] text-zinc-400 font-medium mt-1 leading-relaxed">
+                      {SOCIAL_CHANNELS.find(c => c.id === connectingPlatform)?.setupHint}
+                    </p>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={connectSaving}
+                    className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl uppercase text-xs tracking-wider transition-colors disabled:opacity-50"
+                  >
+                    {connectSaving ? 'Saving Credential...' : `Connect ${connectingPlatform} Account`}
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {SOCIAL_CHANNELS.map(platform => {
+                  const connected = socialAccounts.find(a => a.platform === platform.id && a.isConnected);
+                  return (
+                    <div 
+                      key={platform.id}
+                      className="bg-white border border-zinc-200 rounded-3xl p-5 flex flex-col justify-between space-y-4 hover:shadow-md transition-shadow duration-200"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-start">
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${platform.color}`}>
+                            {platform.name}
+                          </span>
+                          <span className={`text-[10px] font-black uppercase tracking-wider ${connected ? 'text-emerald-600' : 'text-zinc-400'}`}>
+                            {connected ? '● Linked' : '○ Not Linked'}
+                          </span>
+                        </div>
+
+                        {connected ? (
+                          <div className="pt-2 space-y-1">
+                            <div className="text-sm font-black text-black">{connected.handle}</div>
+                            <div className="text-[10px] text-zinc-400 font-mono font-medium">ID: {connected.accountId}</div>
+                            {connected.connectedAt && (
+                              <div className="text-[9px] text-zinc-400 font-medium">Connected: {new Date(connected.connectedAt).toLocaleDateString()}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="pt-2 text-xs text-zinc-500 font-medium leading-relaxed min-h-[50px]">
+                            {platform.apiSupported 
+                              ? `Connect your business ${platform.name} account to enable auto-posting.` 
+                              : `Connect for manual publishing workflow management.`
+                            }
+                          </div>
+                        )}
+                      </div>
+
+                      {connected ? (
+                        <button
+                          onClick={() => handleDisconnectAccount(platform.id)}
+                          className="w-full py-2.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold rounded-xl uppercase text-[10px] tracking-wider text-center"
+                        >
+                          Disconnect Account
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setConnectingPlatform(platform.id)}
+                          className="w-full py-2.5 bg-zinc-50 hover:bg-zinc-100 text-black border border-zinc-200 font-bold rounded-xl uppercase text-[10px] tracking-wider text-center"
+                        >
+                          Connect Account
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -1480,186 +1589,244 @@ export default function B2CDashboardLayout() {
                 </h2>
               </div>
               <button 
-                onClick={() => setIsPostingModalOpen(false)} 
+                onClick={() => { setIsPostingModalOpen(false); setPublishResults(null); }} 
                 className="p-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-black transition-colors"
+                disabled={isPublishing}
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handlePublishPost} className="space-y-4">
-              {/* Media Asset Preview & Selector */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                  1. Creative Asset to Post *
-                </label>
-                <div className="flex items-center gap-3 p-3 bg-zinc-50 border border-zinc-200 rounded-2xl">
-                  <img 
-                    src={postMediaUrl || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&fit=crop'} 
-                    alt="Creative preview" 
-                    className="w-16 h-16 rounded-xl object-cover border border-zinc-200 shadow-sm"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs font-black text-black block truncate">{postHeadline || productName || 'Active Creative'}</span>
-                    <span className="text-[10px] text-zinc-500 font-medium mt-0.5 block">{postMediaType === 'VIDEO' ? '🎬 Video Creative' : '🖼️ Image Banner'}</span>
+            {isPublishing ? (
+              <div className="py-12 flex flex-col items-center justify-center space-y-4">
+                <div className="w-12 h-12 rounded-full border-4 border-red-200 border-t-red-600 animate-spin" />
+                <div className="text-center">
+                  <h3 className="font-black text-black text-sm">Publishing Creative Live...</h3>
+                  <p className="text-xs text-zinc-500 font-medium mt-1">Calling platform APIs and uploading media container assets.</p>
+                </div>
+              </div>
+            ) : publishResults ? (
+              <div className="space-y-6">
+                <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-3">
+                  <h3 className="text-sm font-black text-black">Omnichannel Publishing Status</h3>
+                  <div className="space-y-2">
+                    {Object.entries(publishResults).map(([channel, res]) => (
+                      <div key={channel} className="flex justify-between items-center p-3 bg-white border border-zinc-100 rounded-xl">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-black">{channel}</span>
+                        </div>
+                        <div className="text-right">
+                          {res.success ? (
+                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                              ✓ Posted (ID: {res.postId?.slice(-8)})
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100 max-w-[220px] inline-block truncate" title={res.error}>
+                              ⚠️ {res.error || 'Failed'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                {/* Switch creative selector if multiple exist */}
-                {adRequests.filter(r => r.creativeUrl).length > 1 && (
-                  <div className="mt-2 space-y-1.5">
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase">Or select from other studio creatives:</span>
-                    <div className="flex gap-2 overflow-x-auto pb-1">
-                      {adRequests.filter(r => r.creativeUrl).map(req => (
-                        <button
-                          key={req.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedAdForPost(req);
-                            setPostHeadline(req.headline);
-                            setPostMediaUrl(req.creativeUrl || '');
-                            setPostMediaType(req.adType === 'Video' ? 'VIDEO' : 'IMAGE');
-                          }}
-                          className={`relative w-12 h-12 rounded-xl overflow-hidden border-2 shrink-0 transition-all ${
-                            postMediaUrl === req.creativeUrl ? 'border-red-600 ring-2 ring-red-600/30' : 'border-zinc-200 opacity-70 hover:opacity-100'
-                          }`}
-                        >
-                          <img src={req.creativeUrl} alt="" className="w-full h-full object-cover" />
-                        </button>
-                      ))}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setIsPostingModalOpen(false); setPublishResults(null); setActiveView('posts'); }}
+                    className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl uppercase text-xs tracking-wider"
+                  >
+                    View All Posts
+                  </button>
+                  <button
+                    onClick={() => setPublishResults(null)}
+                    className="w-full py-3.5 bg-zinc-100 hover:bg-zinc-200 text-black font-bold rounded-xl uppercase text-xs tracking-wider border border-zinc-200"
+                  >
+                    Modify & Re-post
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handlePublishPost} className="space-y-4">
+                {/* Media Asset Preview & Selector */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                    1. Creative Asset to Post *
+                  </label>
+                  <div className="flex items-center gap-3 p-3 bg-zinc-50 border border-zinc-200 rounded-2xl">
+                    <img 
+                      src={postMediaUrl || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&fit=crop'} 
+                      alt="Creative preview" 
+                      className="w-16 h-16 rounded-xl object-cover border border-zinc-200 shadow-sm"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs font-black text-black block truncate">{postHeadline || productName || 'Active Creative'}</span>
+                      <span className="text-[10px] text-zinc-500 font-medium mt-0.5 block">{postMediaType === 'VIDEO' ? '🎬 Video Creative' : '🖼️ Image Banner'}</span>
                     </div>
                   </div>
-                )}
-              </div>
 
-              {/* Social Channels Multi-Select */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600">
-                  2. Select Target Channels * ({postChannels.length} selected)
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {SOCIAL_CHANNELS.map(ch => {
-                    const isChecked = postChannels.includes(ch.id);
-                    return (
-                      <button
-                        key={ch.id}
-                        type="button"
-                        onClick={() => handleToggleChannel(ch.id)}
-                        className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between transition-all ${
-                          isChecked 
-                            ? 'border-red-600 bg-red-50 text-red-600 shadow-sm' 
-                            : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-white'
-                        }`}
-                      >
-                        <span>{ch.badge}</span>
-                        {isChecked && <Check className="w-3.5 h-3.5 text-red-600" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Headline */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                  3. Post Headline *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={postHeadline}
-                  onChange={(e) => setPostHeadline(e.target.value)}
-                  placeholder="e.g. FLASH DROP: 25% OFF VELOCITY"
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
-                />
-              </div>
-
-              {/* Caption */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                  4. Post Caption & Copy *
-                </label>
-                <textarea
-                  required
-                  value={postCaption}
-                  onChange={(e) => setPostCaption(e.target.value)}
-                  rows={3}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-medium text-xs text-black focus:outline-none focus:border-red-600 resize-none leading-relaxed"
-                />
-              </div>
-
-              {/* CTA Link */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                  5. Destination / Shop URL
-                </label>
-                <div className="relative">
-                  <input
-                    type="url"
-                    value={postTargetUrl}
-                    onChange={(e) => setPostTargetUrl(e.target.value)}
-                    placeholder="https://yourbrand.com/product"
-                    className="w-full pl-9 pr-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
-                  />
-                  <Globe className="w-4 h-4 text-zinc-400 absolute left-3 top-3.5" />
-                </div>
-              </div>
-
-              {/* Schedule Type */}
-              <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600">
-                  6. Dispatch Schedule
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPostScheduleType('NOW')}
-                    className={`p-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
-                      postScheduleType === 'NOW' 
-                        ? 'bg-red-600 text-white shadow-sm' 
-                        : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-100'
-                    }`}
-                  >
-                    <span>🚀 Post Instantly</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPostScheduleType('LATER')}
-                    className={`p-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
-                      postScheduleType === 'LATER' 
-                        ? 'bg-red-600 text-white shadow-sm' 
-                        : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-100'
-                    }`}
-                  >
-                    <span>📅 Schedule Later</span>
-                  </button>
+                  {/* Switch creative selector if multiple exist */}
+                  {adRequests.filter(r => r.creativeUrl).length > 1 && (
+                    <div className="mt-2 space-y-1.5">
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase">Or select from other studio creatives:</span>
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {adRequests.filter(r => r.creativeUrl).map(req => (
+                          <button
+                            key={req.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedAdForPost(req);
+                              setPostHeadline(req.headline);
+                              setPostMediaUrl(req.creativeUrl || '');
+                              setPostMediaType(req.adType === 'Video' ? 'VIDEO' : 'IMAGE');
+                            }}
+                            className={`relative w-12 h-12 rounded-xl overflow-hidden border-2 shrink-0 transition-all ${
+                              postMediaUrl === req.creativeUrl ? 'border-red-600 ring-2 ring-red-600/30' : 'border-zinc-200 opacity-70 hover:opacity-100'
+                            }`}
+                          >
+                            <img src={req.creativeUrl} alt="" className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {postScheduleType === 'LATER' && (
-                  <div className="pt-2">
-                    <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Select Dispatch Date & Time:</label>
-                    <input
-                      type="datetime-local"
-                      required
-                      value={postScheduledDate}
-                      onChange={(e) => setPostScheduledDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
-                    />
+                {/* Social Channels Multi-Select */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600">
+                    2. Select Target Channels * ({postChannels.length} selected)
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {SOCIAL_CHANNELS.map(ch => {
+                      const isChecked = postChannels.includes(ch.id);
+                      const isConnected = socialAccounts.some(a => a.platform === ch.id && a.isConnected);
+                      return (
+                        <button
+                          key={ch.id}
+                          type="button"
+                          onClick={() => handleToggleChannel(ch.id)}
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-start gap-1 transition-all ${
+                            isChecked 
+                              ? 'border-red-600 bg-red-50 text-red-600 shadow-sm' 
+                              : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-white'
+                          }`}
+                        >
+                          <div className="flex w-full justify-between items-center">
+                            <span>{ch.badge}</span>
+                            {isChecked && <Check className="w-3.5 h-3.5 text-red-600" />}
+                          </div>
+                          <span className={`text-[8px] font-black uppercase ${isConnected ? 'text-emerald-600' : 'text-amber-500'}`}>
+                            {isConnected ? '● Connected' : '○ Not Configured'}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Action Buttons */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  className="btn-shimmer w-full py-4 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl uppercase text-xs tracking-wider shadow-md shadow-red-600/20"
-                >
-                  {postScheduleType === 'NOW' ? 'Publish Post Across Channels' : 'Confirm & Schedule Post'}
-                </button>
-              </div>
-            </form>
+                {/* Headline */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                    3. Post Headline *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={postHeadline}
+                    onChange={(e) => setPostHeadline(e.target.value)}
+                    placeholder="e.g. FLASH DROP: 25% OFF VELOCITY"
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                  />
+                </div>
+
+                {/* Caption */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                    4. Post Caption & Copy *
+                  </label>
+                  <textarea
+                    required
+                    value={postCaption}
+                    onChange={(e) => setPostCaption(e.target.value)}
+                    rows={3}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-medium text-xs text-black focus:outline-none focus:border-red-600 resize-none leading-relaxed"
+                  />
+                </div>
+
+                {/* CTA Link */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                    5. Destination / Shop URL
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="url"
+                      value={postTargetUrl}
+                      onChange={(e) => setPostTargetUrl(e.target.value)}
+                      placeholder="https://yourbrand.com/product"
+                      className="w-full pl-9 pr-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                    />
+                    <Globe className="w-4 h-4 text-zinc-400 absolute left-3 top-3.5" />
+                  </div>
+                </div>
+
+                {/* Schedule Type */}
+                <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600">
+                    6. Dispatch Schedule
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPostScheduleType('NOW')}
+                      className={`p-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                        postScheduleType === 'NOW' 
+                          ? 'bg-red-600 text-white shadow-sm' 
+                          : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-100'
+                      }`}
+                    >
+                      <span>🚀 Post Instantly</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPostScheduleType('LATER')}
+                      className={`p-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                        postScheduleType === 'LATER' 
+                          ? 'bg-red-600 text-white shadow-sm' 
+                          : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-100'
+                      }`}
+                    >
+                      <span>📅 Schedule Later</span>
+                    </button>
+                  </div>
+
+                  {postScheduleType === 'LATER' && (
+                    <div className="pt-2">
+                      <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Select Dispatch Date & Time:</label>
+                      <input
+                        type="datetime-local"
+                        required
+                        value={postScheduledDate}
+                        onChange={(e) => setPostScheduledDate(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    className="btn-shimmer w-full py-4 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl uppercase text-xs tracking-wider shadow-md shadow-red-600/20"
+                  >
+                    {postScheduleType === 'NOW' ? 'Publish Post Across Channels' : 'Confirm & Schedule Post'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

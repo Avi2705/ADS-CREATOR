@@ -35,65 +35,82 @@ export default function B2CCustomers() {
   const [plan, setPlan] = useState('B2C Growth');
 
 
+  const [loading, setLoading] = useState(true);
+
   // Load registered/created users
   useEffect(() => {
-    const localUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    const localB2C = localUsers
-      .filter((u: any) => u.role === 'CUSTOMER' || u.accountType === 'B2C')
-      .map((u: any) => ({
-        id: u._id,
-        referenceId: u.referenceId || `CUST-REF-${Math.floor(100000 + Math.random() * 900000)}`,
-        name: u.firstName ? `${u.firstName} ${u.lastName || ''}` : u.name || 'B2C Client',
-        email: u.email,
-        mobile: u.mobile || u.phone || '+91 98765 00000',
-        products: u.mainProduct ? 1 : 0,
-        ads: u.adsCount || 0,
-        leads: u.leadsCount || 0,
-        sub: u.subscription || 'B2C Growth',
-        status: u.status || 'ACTIVE',
-        assignedEmployeeRefId: u.assignedEmployeeRefId || 'UNASSIGNED'
-      }));
-
-    setCustomers(localB2C);
+    const token = localStorage.getItem('auth_token') || 'mock-jwt-admin-token';
+    setLoading(true);
+    fetch('http://localhost:3000/api/v1/admin/b2c/customers', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.data)) {
+          const list = data.data.map((u: any) => ({
+            id: u._id,
+            referenceId: u.referenceId || `CUST-REF-${Math.floor(100000 + Math.random() * 900000)}`,
+            name: u.name || 'B2C Client',
+            email: u.email,
+            mobile: u.mobile || '+91 98765 00000',
+            products: u.mainProduct ? 1 : 0,
+            ads: u.adsCount || 0,
+            leads: u.leadsCount || 0,
+            sub: u.subscription || 'B2C Growth',
+            status: u.status || 'ACTIVE',
+            assignedEmployeeRefId: u.assignedEmployeeRefId || 'UNASSIGNED'
+          }));
+          setCustomers(list);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to load database B2C customers:", err);
+      })
+      .finally(() => setLoading(false));
   }, [isModalOpen]);
 
 
-  const handleAddCustomer = (e: React.FormEvent) => {
+  const handleAddCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !password) return;
 
     const digitsOnly = mobile.replace(/\D/g, '');
     const fullMobile = `${countryCode} ${digitsOnly}`;
-    const custRefId = `CUST-REF-${Math.floor(100000 + Math.random() * 900000)}`;
+    const token = localStorage.getItem('auth_token') || 'mock-jwt-admin-token';
 
-    const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    const newUser = {
-      _id: `cust-${Date.now()}`,
-      referenceId: custRefId,
-      email,
-      password,
-      name,
-      firstName: name.split(' ')[0] || 'Client',
-      lastName: name.split(' ')[1] || 'User',
-      role: 'CUSTOMER',
-      accountType: 'B2C',
-      status: 'ACTIVE',
-      paymentStatus: 'PAID',
-      subscription: plan,
-      mobile: fullMobile,
-      assignedEmployeeRefId: 'EMP-REF-742918'
-    };
+    try {
+      const res = await fetch('http://localhost:3000/api/v1/admin/b2c/customers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          subscription: plan,
+          mobile: fullMobile
+        })
+      });
 
-    mockUsers.push(newUser);
-    localStorage.setItem('mock_users', JSON.stringify(mockUsers));
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to save customer');
+      }
 
-    setName('');
-    setEmail('');
-    setPassword('');
-    setMobile('');
-    setIsModalOpen(false);
+      setName('');
+      setEmail('');
+      setPassword('');
+      setMobile('');
+      setIsModalOpen(false);
 
-    alert(`Customer account provisioned!\nReference ID: ${custRefId}\nCredentials: ${newUser.email} / ${newUser.password}`);
+      alert(`✅ Customer account provisioned in database!\nReference ID: ${data.customer.referenceId}`);
+    } catch (err: any) {
+      alert(`⚠️ Failed to create customer in database: ${err.message}`);
+    }
   };
 
   const filteredCustomers = customers.filter(c => {
@@ -203,67 +220,59 @@ export default function B2CCustomers() {
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 text-xs font-medium">
-            {filteredCustomers.map((c) => (
-              <tr key={c.id} className="hover:bg-zinc-50/80 transition-colors">
-                
-                {/* Reference ID */}
-                <td className="p-4 pl-6">
-                  <span className="font-mono font-black text-red-600 text-xs px-2.5 py-1 bg-red-50 border border-red-200 rounded-lg">
-                    {c.referenceId}
-                  </span>
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="text-center py-12 text-zinc-400 text-xs font-semibold">
+                  Loading customers...
                 </td>
-
-                {/* Customer Details */}
-                <td className="p-4">
-                  <div className="font-black text-black text-sm">{c.name}</div>
-                  <div className="text-zinc-500 text-xs font-semibold">{c.email} • {c.mobile}</div>
-                </td>
-
-                {/* Plan Tier */}
-                <td className="p-4">
-                  <span className="font-black text-black text-xs">{c.sub}</span>
-                  <div className="text-[10px] text-zinc-400 font-bold">PAID ($29/mo)</div>
-                </td>
-
-                {/* Assigned Staff */}
-                <td className="p-4">
-                  <span className={`font-mono font-bold text-xs px-2 py-0.5 rounded-lg border ${
-                    !c.assignedEmployeeRefId || c.assignedEmployeeRefId === 'UNASSIGNED' || c.assignedEmployeeRefId === 'Unassigned'
-                      ? 'bg-zinc-50 text-zinc-400 border-zinc-200'
-                      : 'bg-zinc-100 text-zinc-700 border-zinc-200'
-                  }`}>
-                    {c.assignedEmployeeRefId || 'Unassigned'}
-                  </span>
-                </td>
-
-
-                {/* Status */}
-                <td className="p-4">
-                  <span className="px-2.5 py-1 bg-red-50 text-red-600 border border-red-200 font-black rounded-lg text-[10px] uppercase">
-                    {c.status}
-                  </span>
-                </td>
-
-                {/* Action */}
-                <td className="p-4 pr-6 text-right">
-                  <button 
-                    onClick={() => navigate(`/admin/b2c/${c.id}`)}
-                    className="btn-shimmer px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-xl uppercase text-xs tracking-wider inline-flex items-center gap-1 shadow-sm"
-                  >
-                    <span>Manage Ad Studio</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </td>
-
               </tr>
-            ))}
-
-            {filteredCustomers.length === 0 && (
+            ) : filteredCustomers.length === 0 ? (
               <tr>
                 <td colSpan={6} className="text-center py-12 text-zinc-400 text-xs font-semibold">
                   No B2C customer records found.
                 </td>
               </tr>
+            ) : (
+              filteredCustomers.map((c) => (
+                <tr key={c.id} className="hover:bg-zinc-50/80 transition-colors">
+                  <td className="p-4 pl-6">
+                    <span className="font-mono font-black text-red-600 text-xs px-2.5 py-1 bg-red-50 border border-red-200 rounded-lg">
+                      {c.referenceId}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <div className="font-black text-black text-sm">{c.name}</div>
+                    <div className="text-zinc-500 text-xs font-semibold">{c.email} • {c.mobile}</div>
+                  </td>
+                  <td className="p-4">
+                    <span className="font-black text-black text-xs">{c.sub}</span>
+                    <div className="text-[10px] text-zinc-400 font-bold">PAID ($29/mo)</div>
+                  </td>
+                  <td className="p-4">
+                    <span className={`font-mono font-bold text-xs px-2 py-0.5 rounded-lg border ${
+                      !c.assignedEmployeeRefId || c.assignedEmployeeRefId === 'UNASSIGNED' || c.assignedEmployeeRefId === 'Unassigned'
+                        ? 'bg-zinc-50 text-zinc-400 border-zinc-200'
+                        : 'bg-zinc-100 text-zinc-700 border-zinc-200'
+                    }`}>
+                      {c.assignedEmployeeRefId || 'Unassigned'}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <span className="px-2.5 py-1 bg-red-50 text-red-600 border border-red-200 font-black rounded-lg text-[10px] uppercase">
+                      {c.status}
+                    </span>
+                  </td>
+                  <td className="p-4 pr-6 text-right">
+                    <button 
+                      onClick={() => navigate(`/admin/b2c/${c.id}`)}
+                      className="btn-shimmer px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-xl uppercase text-xs tracking-wider inline-flex items-center gap-1 shadow-sm"
+                    >
+                      <span>Manage Ad Studio</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>

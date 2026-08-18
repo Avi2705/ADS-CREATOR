@@ -33,28 +33,22 @@ export default function Join() {
   const [description, setDescription] = useState('');
   const [experience, setExperience] = useState('0-1 Years');
 
-  // Form State - Step 3: Intent Choice (B2B, B2C, Explorer)
-  const [intentType, setIntentType] = useState<'B2B' | 'B2C' | 'Explorer'>('B2B');
-
-  // Form State - Step 4: B2B Conditional
-  const [b2bExpectedUsers, setB2bExpectedUsers] = useState(1);
+  // Form State Constants (previously step 3 & 4 choice values)
+  const intentType = 'Explorer';
+  const b2bExpectedUsers = 1;
   const b2bAdChannels: string[] = [];
-  const [b2bSocialPlatforms, setB2bSocialPlatforms] = useState<string[]>([]);
-  const [b2bMainRequirement, setB2bMainRequirement] = useState('');
-  const [b2bExpectedUsage, setB2bExpectedUsage] = useState('Daily');
-  const [b2bAdProblems, setB2bAdProblems] = useState('');
-
-  // Form State - Step 4: B2C Conditional
-  const [b2cProdName, setB2cProdName] = useState('');
-  const [b2cProdCategory, setB2cProdCategory] = useState('');
-  const [b2cProdWebsite, setB2cProdWebsite] = useState('');
-  const [b2cAdMethod, setB2cAdMethod] = useState('');
+  const b2bSocialPlatforms: string[] = [];
+  const b2bMainRequirement = '';
+  const b2bExpectedUsage = 'Daily';
+  const b2bAdProblems = '';
+  const b2cProdName = '';
+  const b2cProdCategory = '';
+  const b2cProdWebsite = '';
+  const b2cAdMethod = '';
   const b2cAdTypes: string[] = [];
-  const [b2cExpectedAds, setB2cExpectedAds] = useState(1);
-
-  // Form State - Step 4: Explorer Conditional
-  const [explorerLearnIntent, setExplorerLearnIntent] = useState('');
-  const [explorerInterestService, setExplorerInterestService] = useState('');
+  const b2cExpectedAds = 1;
+  const explorerLearnIntent = '';
+  const explorerInterestService = '';
   const explorerOptionalBiz = '';
 
   const dispatch = useDispatch();
@@ -111,9 +105,7 @@ export default function Join() {
         alert("Please fill in all required (*) business details.");
         return;
       }
-      setStep(3);
-    } else if (step === 3) {
-      setStep(4);
+      registerUser('COMPLETED');
     }
   };
 
@@ -261,18 +253,7 @@ export default function Join() {
     registerUser('INCOMPLETE');
   };
 
-  const handleFinish = (e: React.FormEvent) => {
-    e.preventDefault();
-    registerUser('COMPLETED');
-  };
 
-  const toggleArrayItem = (list: string[], setList: (arr: string[]) => void, item: string) => {
-    if (list.includes(item)) {
-      setList(list.filter(x => x !== item));
-    } else {
-      setList([...list, item]);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-white text-black flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
@@ -284,7 +265,7 @@ export default function Join() {
           </Link>
           <h2 className="mt-4 text-2xl font-black text-black tracking-tight font-display">Create Your Account</h2>
           <div className="flex items-center justify-center gap-2 mt-3">
-            {[1, 2, 3, 4].map(s => (
+            {[1, 2].map(s => (
               <span key={s} className={`h-2 rounded-full transition-all ${step === s ? 'w-8 bg-red-600' : 'w-2 bg-zinc-200'}`}></span>
             ))}
           </div>
@@ -427,156 +408,10 @@ export default function Join() {
             <div className="flex gap-4 pt-4">
               <button type="button" onClick={() => setStep(1)} className="w-1/4 py-3.5 bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 rounded-xl uppercase text-xs">Back</button>
               <button type="button" onClick={handleSkip} className="w-1/4 py-3.5 border border-dashed border-zinc-300 text-zinc-500 font-bold hover:bg-zinc-50 rounded-xl uppercase text-xs">Skip</button>
-              <button type="submit" className="btn-shimmer flex-1 py-3.5 bg-red-600 text-white font-bold hover:bg-red-700 shadow-md shadow-red-600/20 rounded-xl uppercase text-xs">Next: Intent</button>
+              <button type="submit" className="btn-shimmer flex-1 py-3.5 bg-red-600 text-white font-bold hover:bg-red-700 shadow-md shadow-red-600/20 rounded-xl uppercase text-xs">Create Account</button>
             </div>
           </form>
         )}
-
-        {/* Step 3: Intent Choices */}
-        {step === 3 && (
-          <div className="space-y-6">
-            <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-4 text-center">Why are you here? *</label>
-            
-            <div className="grid grid-cols-1 gap-4">
-              {[
-                { type: 'B2B', title: 'B2B Platform Client', desc: 'I want the AD-HUNTER software to manage multiple products, advertisements, videos, publishing, and customer leads.' },
-                { type: 'B2C', title: 'B2C Ad Creation Service', desc: 'I want to promote my own product/business and need advertisement creation services.' },
-                { type: 'Explorer', title: 'Platform Explorer', desc: 'I want to explore AD-HUNTER and learn more about the platform.' }
-              ].map((card) => (
-                <div 
-                  key={card.type}
-                  onClick={() => setIntentType(card.type as any)}
-                  className={`p-6 rounded-2xl border-2 cursor-pointer transition-all ${
-                    intentType === card.type 
-                      ? 'border-red-600 bg-red-50/40' 
-                      : 'border-zinc-200 hover:border-zinc-300 bg-white'
-                  }`}
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-black text-black text-base">{card.title}</h3>
-                    <input type="radio" checked={intentType === card.type} onChange={() => {}} className="accent-red-600 w-4 h-4" />
-                  </div>
-                  <p className="text-xs text-zinc-600 font-medium leading-relaxed">{card.desc}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-4 pt-6">
-              <button type="button" onClick={() => setStep(2)} className="w-1/4 py-3.5 bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 rounded-xl uppercase text-xs">Back</button>
-              <button type="button" onClick={handleSkip} className="w-1/4 py-3.5 border border-dashed border-zinc-300 text-zinc-500 font-bold hover:bg-zinc-50 rounded-xl uppercase text-xs">Skip</button>
-              <button type="button" onClick={() => setStep(4)} className="btn-shimmer flex-1 py-3.5 bg-red-600 text-white font-bold hover:bg-red-700 shadow-md shadow-red-600/20 rounded-xl uppercase text-xs">Continue</button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Intent-specific questions */}
-        {step === 4 && (
-          <form onSubmit={handleFinish} className="space-y-4">
-            
-            {/* B2B Questions */}
-            {intentType === 'B2B' && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Expected User Seats</label>
-                    <input type="number" value={b2bExpectedUsers} onChange={e => setB2bExpectedUsers(parseInt(e.target.value) || 1)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Expected Software Usage</label>
-                    <select value={b2bExpectedUsage} onChange={e => setB2bExpectedUsage(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none text-sm">
-                      <option value="Daily">Daily</option>
-                      <option value="Weekly">Weekly</option>
-                      <option value="Monthly">Monthly</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Main Platform Requirement</label>
-                  <input type="text" value={b2bMainRequirement} onChange={e => setB2bMainRequirement(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none text-sm" placeholder="AI Video Generation, Lead Collection" />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Social Platforms Used</label>
-                  <div className="flex flex-wrap gap-2">
-                    {['Meta Ads', 'TikTok', 'Google Display', 'LinkedIn'].map(p => (
-                      <button 
-                        type="button" key={p}
-                        onClick={() => toggleArrayItem(b2bSocialPlatforms, setB2bSocialPlatforms, p)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
-                          b2bSocialPlatforms.includes(p) 
-                            ? 'bg-red-600 border-red-600 text-white' 
-                            : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-100'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Current Advertising Pain Points</label>
-                  <textarea value={b2bAdProblems} onChange={e => setB2bAdProblems(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none text-sm h-20 resize-none" placeholder="What are your main advertising struggles today?" />
-                </div>
-              </>
-            )}
-
-            {/* B2C Questions */}
-            {intentType === 'B2C' && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Product Name</label>
-                    <input type="text" value={b2cProdName} onChange={e => setB2cProdName(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none text-sm" placeholder="Summer Dress Collection" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Product Category</label>
-                    <input type="text" value={b2cProdCategory} onChange={e => setB2cProdCategory(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none text-sm" placeholder="Apparel" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Product Website</label>
-                    <input type="text" value={b2cProdWebsite} onChange={e => setB2cProdWebsite(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none text-sm" placeholder="www.myshop.com/summer" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Expected Ads Count / mo</label>
-                    <input type="number" value={b2cExpectedAds} onChange={e => setB2cExpectedAds(parseInt(e.target.value) || 1)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none text-sm" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Current Advertising Methods</label>
-                  <input type="text" value={b2cAdMethod} onChange={e => setB2cAdMethod(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none text-sm" placeholder="Facebook Boost posts, local flyers" />
-                </div>
-              </>
-            )}
-
-            {/* Explorer Questions */}
-            {intentType === 'Explorer' && (
-              <>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">What do you want to learn?</label>
-                  <textarea value={explorerLearnIntent} onChange={e => setExplorerLearnIntent(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none text-sm h-20 resize-none" placeholder="Tell us what platform features you are looking to learn about..." />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Platform Service of Interest</label>
-                  <input type="text" value={explorerInterestService} onChange={e => setExplorerInterestService(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none text-sm" placeholder="Creative image creation, auto reels scheduler" />
-                </div>
-              </>
-            )}
-
-            <div className="flex gap-4 pt-6">
-              <button type="button" onClick={() => setStep(3)} className="w-1/4 py-3.5 bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 rounded-xl uppercase text-xs">Back</button>
-              <button type="button" onClick={handleSkip} className="w-1/4 py-3.5 border border-dashed border-zinc-300 text-zinc-500 font-bold hover:bg-zinc-50 rounded-xl uppercase text-xs">Skip</button>
-              <button type="submit" className="btn-shimmer flex-1 py-3.5 bg-red-600 text-white font-bold hover:bg-red-700 shadow-md shadow-red-600/20 rounded-xl uppercase text-xs">Submit & Complete Profile</button>
-            </div>
-          </form>
-        )}
-
         <div className="mt-8 text-center text-sm font-medium text-zinc-500 border-t border-zinc-200 pt-6">
           Already have an account?{' '}
           <Link to="/login" className="font-bold text-red-600 hover:underline">
