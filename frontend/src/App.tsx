@@ -21,9 +21,7 @@ import B2CCustomerDetail from './pages/admin/B2CCustomerDetail';
 import ExplorerDashboard from './pages/dashboards/ExplorerDashboard';
 import ExplorerFreeAdPage from './pages/public/ExplorerFreeAdPage';
 import EmployeesManager from './pages/admin/EmployeesManager';
-
-
-
+import AdminPricingManager from './pages/admin/AdminPricingManager';
 
 function App() {
   return (
@@ -56,7 +54,8 @@ function App() {
           <Route path="b2c/:id" element={<B2CCustomerDetail />} />
           <Route path="b2b" element={<B2BBusinesses />} />
           <Route path="employees" element={<EmployeesManager />} />
-          <Route path="subscriptions" element={<div className="p-8"><h1 className="text-3xl font-black text-black font-display">Subscriptions</h1><p className="text-zinc-500 mt-2 font-medium">Platform subscription tracking.</p></div>} />
+          <Route path="pricing" element={<AdminPricingManager />} />
+          <Route path="subscriptions" element={<AdminPricingManager />} />
           <Route path="payments" element={<div className="p-8"><h1 className="text-3xl font-black text-black font-display">Payments</h1><p className="text-zinc-500 mt-2 font-medium">Payment gateway settlements.</p></div>} />
           <Route path="audit" element={<div className="p-8"><h1 className="text-3xl font-black text-black font-display">Audit Logs</h1><p className="text-zinc-500 mt-2 font-medium">System activity logs.</p></div>} />
           <Route path="settings" element={<SuperAdminSettings />} />

@@ -13,10 +13,21 @@ dotenv_1.default.config();
 const app = (0, express_1.default)();
 const port = process.env.PORT || 3000;
 const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/adhunter_db';
-app.use((0, helmet_1.default)());
-app.use((0, cors_1.default)());
+app.use((0, helmet_1.default)({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginEmbedderPolicy: false
+}));
+app.use((0, cors_1.default)({
+    origin: '*',
+    credentials: true
+}));
 app.use(express_1.default.json({ limit: '50mb' }));
-app.use('/uploads', express_1.default.static(path_1.default.join(process.cwd(), 'uploads')));
+app.use('/uploads', express_1.default.static(path_1.default.join(process.cwd(), 'uploads'), {
+    setHeaders: (res) => {
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+}));
 const auth_routes_1 = __importDefault(require("./modules/auth/auth.routes"));
 const campaign_routes_1 = __importDefault(require("./modules/campaigns/campaign.routes"));
 const admin_routes_1 = __importDefault(require("./modules/admin/admin.routes"));
@@ -24,6 +35,7 @@ const user_routes_1 = __importDefault(require("./modules/users/user.routes"));
 const freeAd_routes_1 = __importDefault(require("./modules/creatives/freeAd.routes"));
 const b2cRequest_routes_1 = __importDefault(require("./modules/creatives/b2cRequest.routes"));
 const social_routes_1 = __importDefault(require("./modules/social/social.routes"));
+const upload_routes_1 = __importDefault(require("./modules/upload/upload.routes"));
 // Basic health check route
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'ADD CREATOR API is running' });
@@ -36,6 +48,7 @@ app.use('/api/b2c-requests', b2cRequest_routes_1.default);
 app.use('/api/campaigns', campaign_routes_1.default);
 app.use('/api/v1/admin', admin_routes_1.default);
 app.use('/api/social', social_routes_1.default);
+app.use('/api/upload', upload_routes_1.default);
 // Connect to MongoDB and start server
 mongoose_1.default
     .connect(mongoUri)

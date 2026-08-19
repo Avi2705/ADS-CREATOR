@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, ArrowRight, TrendingUp, X, Filter } from 'lucide-react';
+import { Sparkles, ArrowRight, TrendingUp, X, Filter, ArrowLeft, Building2 } from 'lucide-react';
 
-interface CreativeItem {
+export interface CreativeItem {
   id: string;
   title: string;
   category: string;
@@ -13,25 +13,231 @@ interface CreativeItem {
   platform: string;
   hook: string;
   cta: string;
+  clientBrand?: string;
+  isCustomerCreated?: boolean;
 }
+
+const DEFAULT_SHOWCASE_ADS: CreativeItem[] = [
+  {
+    id: 'b2c-ad-1',
+    title: 'Velocity Hyper-Glide X1 Runner',
+    category: 'Footwear',
+    url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1000&auto=format&fit=crop&q=80',
+    leads: '342',
+    roas: '5.8x',
+    ctr: '4.9%',
+    platform: 'Instagram Reel (9:16)',
+    hook: 'Engineered with aerospace-grade carbon fiber propulsion. 25% lighter, 100% faster.',
+    cta: 'Claim 20% Off Drop',
+    clientBrand: 'Velocity Sportswear',
+    isCustomerCreated: true
+  },
+  {
+    id: 'b2c-ad-2',
+    title: 'Chrono-Sport Obsidian Chronograph',
+    category: 'Luxury',
+    url: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=1000&auto=format&fit=crop&q=80',
+    leads: '289',
+    roas: '6.4x',
+    ctr: '3.8%',
+    platform: 'Meta Feed (1:1)',
+    hook: 'Hand-assembled Swiss automatic movement housed in brushed titanium.',
+    cta: 'Explore VIP Collection',
+    clientBrand: 'Chrono Atelier',
+    isCustomerCreated: true
+  },
+  {
+    id: 'b2c-ad-3',
+    title: 'Apex Moto Distressed Leather Jacket',
+    category: 'Fashion',
+    url: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=1000&auto=format&fit=crop&q=80',
+    leads: '418',
+    roas: '5.2x',
+    ctr: '5.4%',
+    platform: 'Story & Carousel (4:5)',
+    hook: 'Handcrafted full-grain Italian leather with bespoke vintage patina.',
+    cta: 'Order Custom Fit',
+    clientBrand: 'Apex Leathercraft',
+    isCustomerCreated: true
+  },
+  {
+    id: 'b2c-ad-4',
+    title: 'Audi RS Edition — Precision Meets Power',
+    category: 'Automotive',
+    url: 'https://images.unsplash.com/photo-1603584173870-7f23fdae1b7a?w=1000&auto=format&fit=crop&q=80',
+    leads: '512',
+    roas: '7.1x',
+    ctr: '6.2%',
+    platform: 'Meta Reel (9:16)',
+    hook: 'Twin-turbocharged V8 performance with intelligent Quattro all-wheel drive.',
+    cta: 'Book Private Test Drive',
+    clientBrand: 'Audi RS Studio',
+    isCustomerCreated: false
+  },
+  {
+    id: 'b2c-ad-5',
+    title: 'Noir Absolu Haute Parfumerie',
+    category: 'Beauty',
+    url: 'https://images.unsplash.com/photo-1584916201218-f4242ceb4809?w=1000&auto=format&fit=crop&q=80',
+    leads: '390',
+    roas: '5.9x',
+    ctr: '4.6%',
+    platform: 'Instagram Story (9:16)',
+    hook: 'Rare Madagascar vanilla and smoked cedarwood formulated for 24-hour sillage.',
+    cta: 'Claim Discovery Set',
+    clientBrand: 'Maison Noir',
+    isCustomerCreated: false
+  },
+  {
+    id: 'b2c-ad-6',
+    title: 'Studio Noise-Canceling Headphones Pro',
+    category: 'Electronics',
+    url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1000&auto=format&fit=crop&q=80',
+    leads: '465',
+    roas: '5.5x',
+    ctr: '5.1%',
+    platform: 'Meta Feed (1:1)',
+    hook: 'Lossless spatial audio with 40-hour battery life and custom titanium drivers.',
+    cta: 'Get Launch Discount',
+    clientBrand: 'Aura Sound Labs',
+    isCustomerCreated: false
+  }
+];
 
 export default function Explore() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedAd, setSelectedAd] = useState<CreativeItem | null>(null);
-  const [creatives, setCreatives] = useState<CreativeItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [creatives, setCreatives] = useState<CreativeItem[]>(DEFAULT_SHOWCASE_ADS);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/ai/free-ad/public-showcase')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.data)) {
-          setCreatives(data.data);
-        }
-      })
-      .catch(err => console.error("Failed to fetch public database ads:", err))
-      .finally(() => setLoading(false));
+    loadAllIntegratedAds();
   }, []);
+
+  const loadAllIntegratedAds = async () => {
+    try {
+      const customerAds: CreativeItem[] = [];
+
+      // 1. Load from all_b2c_requests (Super Admin / B2C studio database)
+      try {
+        const allGlobalReqs = JSON.parse(localStorage.getItem('all_b2c_requests') || '[]');
+        allGlobalReqs.forEach((r: any, idx: number) => {
+          if (r.creativeUrl || (r.productImages && r.productImages.length > 0)) {
+            customerAds.push({
+              id: r.id || `b2c-req-${idx}`,
+              title: r.headline || r.productName || 'B2C Client Ad',
+              category: r.category || 'Footwear',
+              url: r.creativeUrl || r.productImages[0] || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1000&fit=crop',
+              leads: String(r.leads || Math.floor(180 + Math.random() * 250)),
+              roas: r.roas || `${(4.2 + (idx % 3) * 0.8).toFixed(1)}x`,
+              ctr: r.ctr || `${(3.5 + (idx % 4) * 0.6).toFixed(1)}%`,
+              platform: r.format || (r.adType === 'Video' ? 'Video Reel (9:16)' : 'Image Banner (1:1)'),
+              hook: r.description || r.purpose || 'Engineered for high conversion and brand engagement.',
+              cta: r.cta || 'Shop Now',
+              clientBrand: r.customerName || 'B2C Client',
+              isCustomerCreated: true
+            });
+          }
+        });
+      } catch (e) {
+        console.warn("Could not load all_b2c_requests:", e);
+      }
+
+      // 2. Scan all localStorage keys for requests_*
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('requests_')) {
+          try {
+            const userReqs = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(userReqs)) {
+              userReqs.forEach((r: any, idx: number) => {
+                const imgUrl = r.creativeUrl || (r.productImages && r.productImages[0]);
+                if (imgUrl && !customerAds.some(a => a.id === r.id || a.url === imgUrl)) {
+                  customerAds.push({
+                    id: r.id || `local-req-${idx}`,
+                    title: r.headline || r.productName || 'B2C Custom Creative',
+                    category: r.category || 'Apparel',
+                    url: imgUrl,
+                    leads: String(Math.floor(150 + Math.random() * 200)),
+                    roas: `${(4.5 + (idx % 3) * 0.7).toFixed(1)}x`,
+                    ctr: `${(3.8 + (idx % 4) * 0.5).toFixed(1)}%`,
+                    platform: r.adType === 'Video' ? 'Video Ad' : 'Image Ad (1:1)',
+                    hook: r.description || 'Exclusive customer creative generated for multi-channel reach.',
+                    cta: r.cta || 'Get Offer',
+                    clientBrand: 'B2C Customer',
+                    isCustomerCreated: true
+                  });
+                }
+              });
+            }
+          } catch (e) {
+            console.warn("Could not parse key:", key, e);
+          }
+        }
+      }
+
+      // 3. Scan mock_users for generatedFreeAd or product creatives
+      try {
+        const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
+        mockUsers.forEach((u: any, idx: number) => {
+          if (u.generatedFreeAd && u.generatedFreeAd.mediaUrl) {
+            const freeAd = u.generatedFreeAd;
+            if (!customerAds.some(a => a.url === freeAd.mediaUrl)) {
+              customerAds.push({
+                id: `user-free-${idx}`,
+                title: freeAd.headline || freeAd.productName || 'AI Generated Free Ad',
+                category: freeAd.category || 'General',
+                url: freeAd.mediaUrl,
+                leads: '215',
+                roas: '5.1x',
+                ctr: '4.8%',
+                platform: 'AI Studio Creative',
+                hook: freeAd.primaryText || freeAd.description || 'Photorealistic AI generated marketing asset.',
+                cta: freeAd.cta || 'Learn More',
+                clientBrand: u.companyName || u.name || 'Explorer Creator',
+                isCustomerCreated: true
+              });
+            }
+          }
+        });
+      } catch (e) {
+        console.warn("Could not scan mock_users:", e);
+      }
+
+      // 4. Fetch backend public showcase ads if available
+      try {
+        const res = await fetch('http://localhost:3000/api/ai/free-ad/public-showcase');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          data.data.forEach((backendAd: any) => {
+            if (!customerAds.some(a => a.id === backendAd.id || a.url === backendAd.url)) {
+              customerAds.push({
+                ...backendAd,
+                isCustomerCreated: true
+              });
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("Backend showcase endpoint unreachable, using local storage and seeded database ads:", err);
+      }
+
+      // Merge: Customer created ads first, followed by default showcase items
+      const mergedList = [...customerAds];
+      DEFAULT_SHOWCASE_ADS.forEach(defaultAd => {
+        if (!mergedList.some(a => a.title === defaultAd.title || a.url === defaultAd.url)) {
+          mergedList.push(defaultAd);
+        }
+      });
+
+      setCreatives(mergedList);
+    } catch (err) {
+      console.error("Failed to load integrated ads:", err);
+      setCreatives(DEFAULT_SHOWCASE_ADS);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const categories = ['All', ...Array.from(new Set(creatives.map(c => c.category).filter(Boolean)))];
 
@@ -42,6 +248,17 @@ export default function Explore() {
   return (
     <div className="w-full min-h-screen bg-white text-black font-sans selection:bg-red-600 selection:text-white">
       
+      {/* Top-Left Back Navigation */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 -mb-8 flex justify-between items-center relative z-20">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-black transition-colors px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 shadow-sm"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 text-zinc-500" />
+          <span>Back to Home</span>
+        </Link>
+      </div>
+
       {/* Header Section */}
       <section className="relative px-4 sm:px-6 lg:px-8 py-20 lg:py-28 text-center border-b border-zinc-200 overflow-hidden bg-white">
         <div className="max-w-4xl mx-auto space-y-6 relative z-10">
@@ -133,9 +350,17 @@ export default function Explore() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-between p-6">
                       <div className="flex justify-between items-start">
-                        <span className="px-3 py-1 rounded-full bg-red-600 text-white text-[10px] font-black uppercase tracking-wider shadow-sm">
-                          {ad.category}
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className="px-3 py-1 rounded-full bg-red-600 text-white text-[10px] font-black uppercase tracking-wider shadow-sm">
+                            {ad.category}
+                          </span>
+                          {ad.clientBrand && (
+                            <span className="px-2 py-0.5 rounded-md bg-white/95 text-black text-[9px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1">
+                              <Building2 className="w-2.5 h-2.5 text-red-600" />
+                              <span>{ad.clientBrand}</span>
+                            </span>
+                          )}
+                        </div>
                         <span className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-white border border-white/20">
                           {ad.platform}
                         </span>
@@ -180,12 +405,22 @@ export default function Explore() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white border border-zinc-200 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl relative animate-in zoom-in-95 duration-200 space-y-6">
             
-            <button
-              onClick={() => setSelectedAd(null)}
-              className="absolute top-6 right-6 p-2 rounded-xl bg-zinc-100 text-black hover:bg-zinc-200 border border-zinc-200"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex justify-between items-center border-b border-zinc-100 pb-3">
+              <button
+                onClick={() => setSelectedAd(null)}
+                className="px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-black text-xs font-bold transition-colors flex items-center gap-1 border border-zinc-200"
+                title="Go Back"
+              >
+                <ArrowLeft className="w-4 h-4 text-zinc-600" />
+                <span>Back</span>
+              </button>
+              <button
+                onClick={() => setSelectedAd(null)}
+                className="p-2 rounded-xl bg-zinc-100 text-black hover:bg-zinc-200 border border-zinc-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
             <div className="flex flex-col sm:flex-row gap-6 items-start">
               <div className="w-full sm:w-48 aspect-square rounded-2xl overflow-hidden bg-zinc-100 border border-zinc-200 shrink-0">

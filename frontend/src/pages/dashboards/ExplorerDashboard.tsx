@@ -1,11 +1,10 @@
+import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { 
   Building2, ShoppingBag, ArrowRight, 
-  CheckCircle2, Shield
+  CheckCircle2, Shield, Sparkles, Check 
 } from 'lucide-react';
-
-
 
 export default function ExplorerDashboard() {
   const { user } = useSelector((state: any) => state.auth);
@@ -13,25 +12,94 @@ export default function ExplorerDashboard() {
 
   // If user is already B2B or B2C, redirect them to their respective dashboard
   const userCustomerType = user?.customerType || 'EXPLORER';
-  if (userCustomerType === 'B2B') {
-    navigate('/b2b');
-  } else if (userCustomerType === 'B2C') {
-    navigate('/b2c');
+  
+  useEffect(() => {
+    if (userCustomerType === 'B2B') {
+      navigate('/b2b', { replace: true });
+    } else if (userCustomerType === 'B2C') {
+      navigate('/b2c', { replace: true });
+    }
+  }, [userCustomerType, navigate]);
+
+  if (userCustomerType === 'B2B' || userCustomerType === 'B2C') {
+    return (
+      <div className="w-full min-h-[60vh] bg-white flex items-center justify-center p-8">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-4 border-zinc-200 border-t-red-600 animate-spin" />
+          <div className="text-xs font-black text-zinc-600 uppercase tracking-wider">
+            Loading your {userCustomerType === 'B2B' ? 'B2B SaaS Dashboard' : 'B2C Client Portal'}...
+          </div>
+        </div>
+      </div>
+    );
   }
+
+  const freeAdsUsed = user?.freeAdsUsed ?? (user?.freeAdGenerated ? 1 : 0);
+  const freeAdsAllowed = user?.freeAdsAllowed ?? 1;
+  const isFreeAdUsed = freeAdsUsed >= freeAdsAllowed;
 
   return (
     <div className="min-h-screen bg-white text-black font-sans selection:bg-red-600 selection:text-white py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto space-y-12">
+      <div className="max-w-6xl mx-auto space-y-8">
         
+        {/* Free Ad Signup Entitlement Callout */}
+        {!isFreeAdUsed ? (
+          <div className="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-xl shadow-red-600/20">
+            <div className="space-y-1.5 text-center md:text-left">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-[10px] font-black uppercase tracking-wider backdrop-blur-sm">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Free Signup Reward • 0 Payment Required</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black font-display text-white">
+                Create Your 1 Free AI Advertisement
+              </h2>
+              <p className="text-xs sm:text-sm text-white/90 font-medium max-w-xl leading-relaxed">
+                As a new member, you can generate 1 full commercial visual ad with AI copy hooks, audience targeting, and script — completely free without making any payment.
+              </p>
+            </div>
+
+            <Link
+              to="/explorer/free-ad"
+              className="btn-shimmer px-8 py-4 bg-white hover:bg-zinc-100 text-red-600 font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shrink-0 flex items-center gap-2 transition-all hover:scale-105"
+            >
+              <span>Create 1 Free Ad Now</span>
+              <ArrowRight className="w-4 h-4 text-red-600" />
+            </Link>
+          </div>
+        ) : (
+          <div className="bg-zinc-50 border border-zinc-200 rounded-3xl p-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center font-bold shrink-0">
+                <Check className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-black">1 Free Ad Generated & Claimed</h3>
+                <p className="text-xs text-zinc-500 font-medium">Your free ad is active in the studio. Choose B2B or B2C below to unlock unlimited campaign deliverables.</p>
+              </div>
+            </div>
+
+            <Link
+              to="/explorer/free-ad"
+              className="px-5 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-black font-bold text-xs rounded-xl border border-zinc-200 shrink-0 transition-colors"
+            >
+              View Generated Ad →
+            </Link>
+          </div>
+        )}
+
         {/* Top Header Card */}
         <div className="bg-zinc-50 border border-zinc-200 rounded-3xl p-8 sm:p-12 text-center space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-red-600 text-xs font-bold uppercase tracking-wider">
+            <Shield className="w-3.5 h-3.5 text-red-600" />
+            <span>Workspace Explorer Mode</span>
+          </div>
+
           <h1 className="text-3xl sm:text-5xl font-black text-black font-display tracking-tight leading-tight">
             Welcome to <span className="text-red-600">AD-HUNTER</span> Workspace
           </h1>
 
-
           <p className="text-xs sm:text-sm text-zinc-600 font-medium max-w-2xl mx-auto leading-relaxed">
-            You are currently in <strong>Explorer</strong> mode. Explore our platform architecture below and choose how you wish to operate. Selecting an option will guide you to your profile to review and confirm your permanent account type.
+            Explore our dual operating platforms below. When you are ready, choose either <strong>B2B Business SaaS</strong> or <strong>B2C Creative Client</strong> in your profile to activate your full commercial workspace.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
@@ -39,7 +107,7 @@ export default function ExplorerDashboard() {
               to="/explorer/free-ad"
               className="btn-shimmer inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider shadow-md shadow-red-600/20 transition-all"
             >
-              <span>Launch 1 Free AI Ad Studio</span>
+              <span>AI Free Ad Studio</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
 
@@ -47,7 +115,7 @@ export default function ExplorerDashboard() {
               to="/profile"
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-zinc-200 hover:bg-zinc-300 text-black font-bold text-xs uppercase tracking-wider transition-all"
             >
-              <span>Manage Profile & Choose Type</span>
+              <span>Choose Account Type in Profile</span>
             </Link>
           </div>
         </div>

@@ -53,6 +53,8 @@ const UserSchema = new mongoose_1.Schema({
     freeAdsUsed: { type: Number, default: 0 },
     subscription: { type: String, default: null },
     billingCycle: { type: String, enum: ['MONTHLY', 'YEARLY', null], default: null },
+    resetPasswordOtp: { type: String, default: null },
+    resetPasswordExpires: { type: Date, default: null },
     // Employee & Admin Hierarchy
     creatorAdminId: { type: mongoose_1.default.Schema.Types.ObjectId, ref: 'User' },
     creatorAdminRefId: { type: String },

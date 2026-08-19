@@ -2,11 +2,20 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { 
-  ArrowLeft, Image, Video, 
-  Lock, User, ShoppingBag, Send, 
-  CreditCard, Users, Trash2
+  ArrowLeft, 
+  User, ShoppingBag, Send, 
+  CreditCard, Users, Trash2, Eye,
+  Maximize2, X, Play
 } from 'lucide-react';
+import { B2C_PLANS, getPlanConfig } from '../../constants/subscriptionPlans';
+import { AppPlatformAdMockup } from '../../components/ads/AppPlatformAdMockup';
 
+export const isVideoMedia = (url?: string, adType?: string) => {
+  if (adType === 'Video' || adType === 'VIDEO') return true;
+  if (!url) return false;
+  const clean = url.toLowerCase().split('?')[0];
+  return clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov') || clean.endsWith('.m4v') || clean.includes('gtv-videos-bucket') || clean.includes('video');
+};
 
 interface Customer {
   _id: string;
@@ -51,7 +60,6 @@ interface AdRequest {
   productImages?: string[];
 }
 
-
 export default function B2CCustomerDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -65,8 +73,7 @@ export default function B2CCustomerDetail() {
     currentUser.email?.toLowerCase().includes('admin')
   );
 
-
-  const [activeTab, setActiveTab] = useState<'profile' | 'product' | 'requests' | 'employees' | 'payments'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'profile' | 'product' | 'employees' | 'payments'>('requests');
   const [customer, setCustomer] = useState<Customer | null>(null);
 
   // Profile Edit fields
@@ -77,64 +84,128 @@ export default function B2CCustomerDetail() {
   const [status, setStatus] = useState('ACTIVE');
   const [employeeName, setEmployeeName] = useState('');
   const [assignedEmployeeRefId, setAssignedEmployeeRefId] = useState('');
+  const [customerPlan, setCustomerPlan] = useState('B2C Basic Plan');
 
   // Ad Requests Workspace State
   const [requests, setRequests] = useState<AdRequest[]>([]);
-  const [selectedReq, setSelectedReq] = useState<AdRequest | null>(null);
-  
-  // Create / Upload Creative Form State
-  const [creativeUrl, setCreativeUrl] = useState('https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&fit=crop');
-  const [creativeVersion, setCreativeVersion] = useState(1);
-  const [reqStatus, setReqStatus] = useState<AdRequest['status']>('CUSTOMER_REVIEW');
-  const [actionType, setActionType] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
+  const [adminEmployees, setAdminEmployees] = useState<any[]>([]);
 
+  // Full Screen Live Ad Preview Modal State (Admin Interactive Ad Inspection)
+  const [fullPreviewAd, setFullPreviewAd] = useState<{
+    mediaUrl: string;
+    adType: 'Image' | 'Video' | 'Both' | string;
+    headline: string;
+    description: string;
+    brandName: string;
+    format?: string;
+    version?: number;
+    productName?: string;
+    cta?: string;
+  } | null>(null);
+
+  // Load Customer & Requests & Staff
   useEffect(() => {
+    if (!id) return;
+
     const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
+    const emps = mockUsers.filter(
+      (u: any) => 
+        (u.role === 'EMPLOYEE' || u.role === 'MANAGER' || u.role === 'SUPPORT' || u.role === 'DESIGNER') &&
+        u.accountType !== 'B2B' && u.accountType !== 'B2C'
+    );
+    setAdminEmployees(emps);
+
     const found = mockUsers.find((u: any) => u._id === id || u.referenceId === id || u.email === id);
+    
     if (found) {
       setCustomer(found);
-      setFirstName(found.firstName || found.name?.split(' ')[0] || '');
-      setLastName(found.lastName || found.name?.split(' ')[1] || '');
-      setCompanyName(found.companyName || 'B2C Client');
-      setMobile(found.mobile || '');
+      setFirstName(found.firstName || (found.name ? found.name.split(' ')[0] : ''));
+      setLastName(found.lastName || (found.name ? found.name.split(' ').slice(1).join(' ') : ''));
+      setCompanyName(found.companyName || '');
+      setMobile(found.mobile || found.phone || '');
       setStatus(found.status || 'ACTIVE');
-      setEmployeeName(found.employeeName || 'Unassigned');
-      setAssignedEmployeeRefId(found.assignedEmployeeRefId || 'Unassigned');
+      setEmployeeName(found.employeeName || 'Sarah Jenkins');
+      setAssignedEmployeeRefId(found.assignedEmployeeRefId || 'EMP-REF-742918');
+      setCustomerPlan(found.subscription || 'B2C Basic Plan');
 
-
-      // Load requests specific to this customer's ID
-      const savedRequests = localStorage.getItem(`requests_${found._id}`);
-      if (savedRequests) {
-        setRequests(JSON.parse(savedRequests));
+      // Load Requests
+      const userReqs = localStorage.getItem(`requests_${found._id}`) || 
+                       localStorage.getItem(`requests_${found.email}`) || 
+                       localStorage.getItem(`requests_${found.referenceId}`);
+      if (userReqs) {
+        try {
+          setRequests(JSON.parse(userReqs));
+        } catch {
+          setRequests([]);
+        }
       } else {
-        setRequests([]);
+        const allB2C = JSON.parse(localStorage.getItem('all_b2c_requests') || '[]');
+        const matched = allB2C.filter((r: any) => r.userId === found._id || r.userEmail === found.email);
+        setRequests(matched);
       }
+    } else {
+      // Backend API lookup fallback
+      const token = localStorage.getItem('auth_token') || 'mock-jwt-admin-token';
+      fetch(`http://localhost:3000/api/v1/admin/b2c/customers/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.customer) {
+            setCustomer(data.customer);
+            setFirstName(data.customer.firstName || '');
+            setLastName(data.customer.lastName || '');
+            setCompanyName(data.customer.companyName || '');
+            setMobile(data.customer.mobile || '');
+            setStatus(data.customer.status || 'ACTIVE');
+            setCustomerPlan(data.customer.subscription || 'B2C Basic Plan');
+            if (Array.isArray(data.requests)) {
+              setRequests(data.requests);
+            }
+          }
+        })
+        .catch(err => console.error("Error loading B2C customer from API:", err));
     }
   }, [id]);
-
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customer) return;
 
+    const planDef = getPlanConfig(customerPlan);
+
+    const updated = {
+      ...customer,
+      firstName,
+      lastName,
+      name: `${firstName} ${lastName}`.trim(),
+      companyName,
+      mobile,
+      status,
+      employeeName,
+      assignedEmployeeRefId,
+      subscription: planDef.name,
+      plan: planDef.name,
+      maxProducts: planDef.maxProducts,
+      imageAdsPerProduct: planDef.imageAdsPerProduct,
+      videoAdsPerProduct: planDef.videoAdsPerProduct,
+      allowVideos: planDef.allowVideos
+    };
+
+    setCustomer(updated);
+
     const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    const idx = mockUsers.findIndex((u: any) => u._id === customer._id);
+    const idx = mockUsers.findIndex((u: any) => u._id === customer._id || u.email === customer.email);
     if (idx !== -1) {
-      const updated = {
-        ...mockUsers[idx],
-        firstName,
-        lastName,
-        name: `${firstName} ${lastName}`,
-        companyName,
-        mobile,
-        status,
-        employeeName,
-        assignedEmployeeRefId
-      };
       mockUsers[idx] = updated;
       localStorage.setItem('mock_users', JSON.stringify(mockUsers));
-      setCustomer(updated);
-      alert("Customer profile successfully updated in database!");
+
+      const authUser = JSON.parse(localStorage.getItem('auth_user') || 'null');
+      if (authUser && (authUser._id === updated._id || authUser.email === updated.email)) {
+        localStorage.setItem('auth_user', JSON.stringify({ ...authUser, ...updated }));
+      }
+
+      alert(`✅ Customer profile & subscription (${planDef.name}) successfully updated in database!`);
     }
   };
 
@@ -149,37 +220,6 @@ export default function B2CCustomerDetail() {
     }
   };
 
-  const handleUploadCreative = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isAdmin) {
-      alert("Unauthorized: Only Administrators are permitted to create/upload image or video ad assets.");
-      return;
-    }
-
-    if (!selectedReq || !creativeUrl) {
-      alert("Please enter a creative url media link.");
-      return;
-    }
-
-    const updated = requests.map(r => {
-      if (r.id === selectedReq.id) {
-        return {
-          ...r,
-          adType: actionType === 'IMAGE' ? ('Image' as const) : ('Video' as const),
-          creativeUrl,
-          creativeVersion,
-          status: reqStatus
-        };
-      }
-      return r;
-    });
-
-    setRequests(updated);
-    localStorage.setItem(`requests_${customer?._id}`, JSON.stringify(updated));
-    setSelectedReq(null);
-    alert(`New ${actionType === 'IMAGE' ? 'Image Banner' : 'Video Creative'} submitted to B2C Client Portal!`);
-  };
-
   if (!customer) {
     return (
       <div className="p-8 text-center bg-white text-black space-y-4">
@@ -191,41 +231,40 @@ export default function B2CCustomerDetail() {
     );
   }
 
-  const custRefId = customer.referenceId || 'CUST-REF-918234';
+  const activePlanDef = getPlanConfig(customer.subscription || customerPlan);
 
   return (
-    <div className="space-y-8 bg-white text-black min-h-screen">
+    <div className="space-y-8 font-sans">
       
-      {/* Top Header Strip */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-200 pb-6">
+      {/* Top Breadcrumb & Navigation */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-200 pb-6">
         <div className="flex items-center gap-4">
           <Link
             to="/admin/b2c"
-            className="p-2.5 rounded-xl bg-zinc-100 text-black hover:bg-zinc-200 transition-colors border border-zinc-200"
+            className="p-2.5 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-100 text-black transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono font-black text-red-600 text-xs px-2.5 py-0.5 bg-red-50 border border-red-200 rounded-lg">
-                {custRefId}
+              <span className="font-mono text-xs font-bold text-red-600">
+                {customer.referenceId || 'CUST-REF-109284'}
               </span>
-              <span className="text-[10px] font-black uppercase text-black bg-zinc-100 px-2 py-0.5 rounded-full border border-zinc-200">
-                {customer.subscription || 'B2C Growth Tier'}
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+                {customer.status || 'ACTIVE'}
               </span>
             </div>
-            <h1 className="text-3xl font-black text-black font-display tracking-tight mt-1">
-              {customer.companyName || `${firstName} ${lastName}`}
+            <h1 className="text-2xl font-black text-black tracking-tight mt-0.5">
+              {customer.name || `${customer.firstName || 'B2C'} ${customer.lastName || 'Client'}`}
             </h1>
-            <p className="text-xs text-zinc-500 font-semibold">{customer.email} • {mobile || 'No Phone'}</p>
+            <p className="text-xs text-zinc-500 font-medium">{customer.email} • {customer.mobile || '+91 98765 00000'}</p>
           </div>
         </div>
 
-        {/* Action Controls & Guard */}
         <div className="flex items-center gap-3">
-          <div className="px-3.5 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-right">
-            <div className="text-[9px] uppercase font-bold text-zinc-400">Assigned Staff</div>
-            <div className="text-xs font-mono font-black text-black">{assignedEmployeeRefId}</div>
+          <div className="px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-2xl text-right">
+            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block">Active Tier</span>
+            <span className="text-xs font-black text-red-600">{activePlanDef.name}</span>
           </div>
 
           {isAdmin && (
@@ -242,8 +281,8 @@ export default function B2CCustomerDetail() {
       {/* Tabs Switcher */}
       <div className="flex gap-2 border-b border-zinc-200 pb-4 overflow-x-auto">
         {[
-          { id: 'requests', label: 'Ad Creatives & Studio', icon: Send },
-          { id: 'profile', label: 'Client Profile', icon: User },
+          { id: 'requests', label: `Created Ads & Videos (${requests.length})`, icon: Send },
+          { id: 'profile', label: 'Client Profile & Plan', icon: User },
           { id: 'product', label: 'Product Catalog', icon: ShoppingBag },
           { id: 'employees', label: 'Staff Assignment', icon: Users },
           { id: 'payments', label: 'Payment Invoices', icon: CreditCard }
@@ -267,211 +306,112 @@ export default function B2CCustomerDetail() {
         })}
       </div>
 
-      {/* 1. CREATIVE WORKSPACE (WITH ADMIN-ONLY CREATION BUTTONS) */}
+      {/* 1. CREATED ADS & VIDEOS TAB (AUDIT VIEW) */}
       {activeTab === 'requests' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Ad Requests List */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="flex justify-between items-center border-b border-zinc-100 pb-3">
-              <h3 className="font-black text-black text-lg">Client Ad Requests</h3>
-
-              
-              {/* ADMIN-ONLY ACTION NOTICE */}
-              {!isAdmin && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-100 border border-zinc-200 text-zinc-600 text-[10px] font-bold">
-                  <Lock className="w-3 h-3 text-red-600" />
-                  <span>Ad creation restricted to Super Admin</span>
-                </div>
-              )}
+        <div className="space-y-6">
+          <div className="flex justify-between items-center border-b border-zinc-100 pb-3">
+            <div>
+              <h3 className="font-black text-black text-lg">Customer Created Ad Creatives</h3>
+              <p className="text-xs text-zinc-500 font-medium">All live image banners and motion video ads generated by this client.</p>
             </div>
-            
-            <div className="space-y-4">
-              {requests.map(req => (
-                <div key={req.id} className="p-6 bg-white border border-zinc-200 rounded-3xl shadow-sm space-y-4">
+            <span className="px-3 py-1 bg-zinc-100 border border-zinc-200 font-mono text-xs font-black rounded-xl">
+              {requests.length} Total Creatives
+            </span>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {requests.map(req => (
+              <div key={req.id} className="p-6 bg-white border border-zinc-200 rounded-3xl shadow-sm space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="font-mono text-[10px] font-bold text-zinc-400">{req.id}</div>
-                      <h4 className="font-black text-black text-base mt-0.5">{req.headline}</h4>
-                      <p className="text-xs text-zinc-500 font-semibold mt-1">
-                        Format: {req.format} • Type: {req.adType} • Purpose: {req.purpose}
+                      <h4 className="font-black text-black text-base mt-0.5">{req.headline || req.productName}</h4>
+                      <p className="text-[11px] text-zinc-500 font-semibold mt-0.5">
+                        {req.format || 'Instagram Post (1:1)'} • {req.adType === 'Video' ? '🎬 Motion Video' : '🖼️ Image Banner'}
                       </p>
                     </div>
-                    <span className="px-3 py-1 bg-red-50 text-red-600 border border-red-200 font-black rounded-lg text-[10px] uppercase">
+                    <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 font-black rounded-lg text-[9px] uppercase">
                       {req.status}
                     </span>
                   </div>
 
-                  <p className="text-xs text-zinc-600 font-medium bg-zinc-50 p-4 rounded-2xl leading-relaxed border border-zinc-100">
+                  {req.creativeUrl && (
+                    <div 
+                      onClick={() => setFullPreviewAd({
+                        mediaUrl: req.creativeUrl || '',
+                        adType: req.adType,
+                        headline: req.headline || req.productName,
+                        description: req.description,
+                        brandName: customer?.companyName || customer?.name || 'Brand Partner',
+                        format: req.format,
+                        version: req.creativeVersion || 1,
+                        productName: req.productName,
+                        cta: req.cta || "I'm Interested"
+                      })}
+                      className="relative group cursor-pointer rounded-2xl overflow-hidden border border-zinc-200 shadow-sm bg-black aspect-video"
+                    >
+                      {isVideoMedia(req.creativeUrl, req.adType) ? (
+                        <div className="relative w-full h-full bg-black flex items-center justify-center">
+                          <video 
+                            src={req.creativeUrl} 
+                            autoPlay 
+                            loop 
+                            muted 
+                            playsInline 
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute top-2 left-2 px-2 py-0.5 bg-red-600/90 text-white font-black text-[9px] uppercase rounded-md flex items-center gap-1">
+                            <Play className="w-2.5 h-2.5 fill-white" />
+                            <span>Play Video</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <img src={req.creativeUrl} alt="Ad creative" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      )}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white font-black text-xs uppercase tracking-wider backdrop-blur-[2px]">
+                        <Maximize2 className="w-4 h-4" />
+                        <span>Inspect in Simulator</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-xs text-zinc-600 font-medium bg-zinc-50 p-3.5 rounded-2xl leading-relaxed border border-zinc-100 line-clamp-3">
                     {req.description}
                   </p>
+                </div>
 
-                  {/* Customer Product Photos Gallery */}
-                  {req.productImages && req.productImages.length > 0 && (
-                    <div className="space-y-2 bg-zinc-50/70 p-3.5 rounded-2xl border border-zinc-200">
-                      <span className="text-[10px] uppercase font-black tracking-wider text-zinc-500 block">
-                        Customer Attached Product Photos ({req.productImages.length})
-                      </span>
-                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                        {req.productImages.map((img, i) => (
-                          <img 
-                            key={i} 
-                            src={img} 
-                            alt={`Product photo ${i + 1}`} 
-                            className="aspect-square w-full object-cover rounded-xl border border-zinc-200 shadow-sm"
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
+                <div className="flex items-center justify-between border-t border-zinc-100 pt-3 text-[10px]">
+                  <span className="font-bold text-zinc-400">Created: {req.createdDate}</span>
                   {req.creativeUrl && (
-                    <div className="space-y-2">
-                      <span className="text-[10px] uppercase font-bold text-zinc-400">Current Creative Asset</span>
-                      <img src={req.creativeUrl} alt="Ad creative" className="w-full h-40 object-cover rounded-2xl border border-zinc-200" />
-                    </div>
-                  )}
-
-                  {/* ADMIN-ONLY ACTION BUTTONS: CREATE AD AS IMAGE & CREATE AD AS VIDEO */}
-                  {isAdmin ? (
-                    <div className="flex items-center justify-between border-t border-zinc-100 pt-4 gap-3">
-                      <span className="text-[10px] font-bold text-zinc-400">Submitted: {req.createdDate}</span>
-                      
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => {
-                            setSelectedReq(req);
-                            setActionType('IMAGE');
-                            if (req.productImages && req.productImages.length > 0) {
-                              setCreativeUrl(req.productImages[0]);
-                            }
-                          }}
-                          className="btn-shimmer px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm shadow-red-600/20"
-                        >
-                          <Image className="w-3.5 h-3.5" />
-                          <span>Create a Ad as Image</span>
-                        </button>
-
-                        <button 
-                          onClick={() => {
-                            setSelectedReq(req);
-                            setActionType('VIDEO');
-                            if (req.productImages && req.productImages.length > 0) {
-                              setCreativeUrl(req.productImages[0]);
-                            }
-                          }}
-                          className="btn-shimmer px-4 py-2 bg-black text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 hover:bg-zinc-900 border border-zinc-800"
-                        >
-                          <Video className="w-3.5 h-3.5 text-red-600" />
-                          <span>Create a Ad as Video</span>
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex justify-between items-center border-t border-zinc-100 pt-3 text-[10px] text-zinc-400 font-bold">
-                      <span>Submitted: {req.createdDate}</span>
-                      <span className="text-zinc-500">Employee review mode</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Creative Studio Generator Panel */}
-          <div className="lg:col-span-1">
-            {isAdmin && selectedReq ? (
-              <div className="bg-white rounded-3xl p-6 border border-zinc-200 shadow-sm space-y-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="px-2 py-0.5 bg-red-50 text-red-600 font-black rounded-lg text-[9px] uppercase">
-                      Admin Studio Tool
-                    </span>
-                    <h3 className="font-black text-black text-base mt-1">
-                      Generate {actionType === 'IMAGE' ? 'Image Banner' : 'Video Creative'}
-                    </h3>
-                  </div>
-                  <button onClick={() => setSelectedReq(null)} className="text-zinc-400 hover:text-black">✕</button>
-                </div>
-
-                {/* Customer Attached Photos Quick Selector */}
-                {selectedReq.productImages && selectedReq.productImages.length > 0 && (
-                  <div className="space-y-2 p-3 bg-zinc-50 border border-zinc-200 rounded-2xl">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-zinc-600 block">
-                      Select Customer Photo for Ad ({selectedReq.productImages.length})
-                    </span>
-                    <div className="grid grid-cols-4 gap-2">
-                      {selectedReq.productImages.map((img, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => setCreativeUrl(img)}
-                          className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all ${
-                            creativeUrl === img 
-                              ? 'border-red-600 ring-2 ring-red-600/30' 
-                              : 'border-zinc-200 hover:border-zinc-400'
-                          }`}
-                        >
-                          <img src={img} alt={`Choice ${i + 1}`} className="w-full h-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <form onSubmit={handleUploadCreative} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Creative Asset Media URL</label>
-                    <input 
-                      type="url" 
-                      required 
-                      value={creativeUrl} 
-                      onChange={e => setCreativeUrl(e.target.value)}
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
-                    />
-                  </div>
-
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Creative Version</label>
-                    <input 
-                      type="number" 
-                      required 
-                      value={creativeVersion} 
-                      onChange={e => setCreativeVersion(parseInt(e.target.value) || 1)}
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Dispatch Status</label>
-                    <select 
-                      value={reqStatus} 
-                      onChange={e => setReqStatus(e.target.value as any)}
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                    <button 
+                      onClick={() => setFullPreviewAd({
+                        mediaUrl: req.creativeUrl || '',
+                        adType: req.adType,
+                        headline: req.headline || req.productName || 'Exclusive Offer',
+                        description: req.description || '',
+                        brandName: customer?.companyName || customer?.name || 'Brand Partner',
+                        format: req.format || 'Instagram Post (1:1)',
+                        version: req.creativeVersion || 1,
+                        productName: req.productName,
+                        cta: req.cta || "I'm Interested"
+                      })}
+                      className="px-3 py-1.5 bg-zinc-900 hover:bg-black text-white font-bold text-[10px] rounded-lg uppercase tracking-wider flex items-center gap-1.5 shadow-sm"
                     >
-                      <option value="CUSTOMER_REVIEW">CUSTOMER_REVIEW (Awaiting Approval)</option>
-                      <option value="IN_PROGRESS">IN_PROGRESS</option>
-                      <option value="PUBLISHED">PUBLISHED (Live across channels)</option>
-                    </select>
-                  </div>
-
-                  <button 
-                    type="submit" 
-                    className="btn-shimmer w-full py-4 bg-red-600 text-white font-black hover:bg-red-700 shadow-md shadow-red-600/20 rounded-xl uppercase text-xs tracking-wider"
-                  >
-                    Deploy {actionType === 'IMAGE' ? 'Image Ad' : 'Video Ad'}
-                  </button>
-                </form>
+                      <Eye className="w-3 h-3 text-red-500" />
+                      <span>Inspect in Simulator</span>
+                    </button>
+                  )}
+                </div>
               </div>
-            ) : (
-              <div className="bg-zinc-50 rounded-3xl p-6 border border-zinc-200 text-center space-y-3">
-                <span className="text-3xl block">🎨</span>
-                <h4 className="font-black text-black text-sm">Creative Studio Actions</h4>
-                <p className="text-xs text-zinc-500 font-medium leading-relaxed">
-                  {isAdmin 
-                    ? "Click 'Create a Ad as Image' or 'Create a Ad as Video' on any customer request to process and deploy."
-                    : "Employees can inspect and review customer submissions. Creative generation is locked to Super Admin."}
+            ))}
+
+            {requests.length === 0 && (
+              <div className="col-span-3 py-12 text-center bg-zinc-50 rounded-3xl border border-dashed border-zinc-300">
+                <span className="text-3xl block mb-2">🎨</span>
+                <h4 className="font-black text-black text-base">No Ad Creatives Generated Yet</h4>
+                <p className="text-xs text-zinc-500 font-medium mt-1">
+                  Customer has not created any image or video ads yet. Ads created by customer will appear here automatically.
                 </p>
               </div>
             )}
@@ -482,7 +422,7 @@ export default function B2CCustomerDetail() {
       {/* 2. Client Profile Tab */}
       {activeTab === 'profile' && (
         <div className="max-w-xl bg-white rounded-3xl p-8 border border-zinc-200 shadow-sm space-y-6">
-          <h3 className="font-black text-black text-lg border-b border-zinc-100 pb-3">Edit Client Profile</h3>
+          <h3 className="font-black text-black text-lg border-b border-zinc-100 pb-3">Edit Client Profile & Subscription</h3>
           <form onSubmit={handleSaveProfile} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -495,33 +435,27 @@ export default function B2CCustomerDetail() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Brand Name</label>
-                <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Mobile Phone</label>
-                <input type="text" value={mobile} onChange={e => setMobile(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600" />
-              </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Brand / Store Name</label>
+              <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600" />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Status</label>
-                <select value={status} onChange={e => setStatus(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600">
-                  <option value="ACTIVE">ACTIVE</option>
-                  <option value="SUSPENDED">SUSPENDED</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Plan Tier</label>
-                <input type="text" readOnly value={customer.subscription || 'B2C Growth'} className="w-full px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-xl font-bold text-xs text-zinc-700 cursor-not-allowed" />
-              </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Mobile Phone</label>
+              <input type="text" value={mobile} onChange={e => setMobile(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Subscription Plan</label>
+              <select value={customerPlan} onChange={e => setCustomerPlan(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600">
+                {B2C_PLANS.map(p => (
+                  <option key={p.name} value={p.name}>{p.name} (₹{p.monthlyPrice}/mo)</option>
+                ))}
+              </select>
             </div>
 
             <button type="submit" className="btn-shimmer w-full py-4 bg-red-600 text-white font-black hover:bg-red-700 shadow-md shadow-red-600/20 rounded-xl uppercase text-xs tracking-wider">
-              Save Profile Updates
+              Save Profile Changes
             </button>
           </form>
         </div>
@@ -529,63 +463,147 @@ export default function B2CCustomerDetail() {
 
       {/* 3. Product Catalog Tab */}
       {activeTab === 'product' && (
-        <div className="max-w-2xl bg-white rounded-3xl p-8 border border-zinc-200 shadow-sm space-y-4">
-          <h3 className="font-black text-black text-lg border-b border-zinc-100 pb-3">Flagship Product Details</h3>
-          <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-zinc-700 bg-zinc-50 p-5 rounded-2xl border border-zinc-200">
-            <div>
-              <span className="text-[10px] text-zinc-400 block uppercase font-bold">Brand Product</span>
-              <span className="text-black font-black text-sm">{customer.companyName || 'Air Max Velocity Pro'}</span>
+        <div className="bg-white rounded-3xl p-8 border border-zinc-200 shadow-sm space-y-6 max-w-xl">
+          <h3 className="font-black text-black text-lg border-b border-zinc-100 pb-3">Listed Products</h3>
+          <div className="p-5 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-2 text-xs">
+            <div className="flex justify-between font-black text-sm text-black">
+              <span>Primary Product</span>
+              <span className="text-red-600 font-mono">₹{customer.discount ? 1499 : 1999}</span>
             </div>
-            <div>
-              <span className="text-[10px] text-zinc-400 block uppercase font-bold">Target Audience</span>
-              <span className="text-black font-black">{customer.targetAudience || 'Marathon runners, sneakerheads'}</span>
-            </div>
-            <div className="col-span-2 pt-2 border-t border-zinc-200">
-              <span className="text-[10px] text-zinc-400 block uppercase font-bold">Marketing Copy Description</span>
-              <p className="text-zinc-700 mt-1 leading-relaxed">{customer.description || 'Ultra-responsive carbon fiber running footwear.'}</p>
-            </div>
+            <p className="text-zinc-500 font-medium">{customer.description || 'Premium lifestyle product offering.'}</p>
+            <div className="text-[10px] font-bold text-zinc-400 pt-1">Target Audience: {customer.targetAudience || 'General Consumers'}</div>
           </div>
         </div>
       )}
 
       {/* 4. Staff Assignment Tab */}
       {activeTab === 'employees' && (
-        <div className="max-w-md bg-white rounded-3xl p-8 border border-zinc-200 shadow-sm space-y-4">
-          <h3 className="font-black text-black text-lg border-b border-zinc-100 pb-3">Assigned Staff Specialist</h3>
-          <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl flex justify-between items-center">
-            <div>
-              <div className="font-black text-black text-sm">{employeeName}</div>
-              <div className="text-[10px] font-mono text-red-600 font-bold">{assignedEmployeeRefId}</div>
-            </div>
-            <span className="px-3 py-1 bg-red-50 text-red-600 font-black rounded-lg text-[10px] uppercase">
-              Assigned
-            </span>
+        <div className="bg-white rounded-3xl p-8 border border-zinc-200 shadow-sm space-y-6 max-w-xl">
+          <div>
+            <h3 className="font-black text-black text-lg">Assigned Staff Specialist</h3>
+            <p className="text-xs text-zinc-500 font-medium mt-0.5">
+              Assign or change the dedicated AD-HUNTER account specialist for this B2C customer.
+            </p>
           </div>
+
+          <div className="p-5 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-2 text-xs">
+            <div className="flex justify-between items-center">
+              <span className="font-black text-black text-sm">{employeeName || 'Sarah Jenkins'}</span>
+              <span className="font-mono text-[10px] font-bold text-red-600">{assignedEmployeeRefId || 'EMP-REF-742918'}</span>
+            </div>
+            <p className="text-zinc-500 font-medium">Currently assigned account manager and creative consultant.</p>
+          </div>
+
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (!customer) return;
+            const chosen = adminEmployees.find(emp => emp.referenceId === assignedEmployeeRefId);
+            const name = chosen ? chosen.name : employeeName;
+            
+            const updated = {
+              ...customer,
+              employeeName: name,
+              assignedEmployeeRefId: assignedEmployeeRefId
+            };
+            setCustomer(updated);
+            setEmployeeName(name);
+
+            const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
+            const idx = mockUsers.findIndex((u: any) => u._id === customer._id || u.email === customer.email);
+            if (idx !== -1) {
+              mockUsers[idx].employeeName = name;
+              mockUsers[idx].assignedEmployeeRefId = assignedEmployeeRefId;
+              mockUsers[idx].assignedEmployeeName = name;
+              localStorage.setItem('mock_users', JSON.stringify(mockUsers));
+            }
+            alert(`✅ Assigned ${name} (${assignedEmployeeRefId}) to ${customer.name || customer.email}!`);
+          }} className="space-y-4 pt-2">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                Select from Active Headquarters Employees
+              </label>
+              <select 
+                value={assignedEmployeeRefId} 
+                onChange={e => {
+                  setAssignedEmployeeRefId(e.target.value);
+                  const matched = adminEmployees.find(emp => emp.referenceId === e.target.value);
+                  if (matched) setEmployeeName(matched.name);
+                }}
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+              >
+                {adminEmployees.map(emp => (
+                  <option key={emp._id || emp.referenceId} value={emp.referenceId}>
+                    {emp.name} ({emp.referenceId}) • {emp.department || emp.role}
+                  </option>
+                ))}
+                {adminEmployees.length === 0 && (
+                  <option value="EMP-REF-742918">Sarah Jenkins (EMP-REF-742918) • Lead Specialist</option>
+                )}
+              </select>
+            </div>
+
+            <button 
+              type="submit" 
+              className="btn-shimmer w-full py-4 bg-red-600 text-white font-black hover:bg-red-700 shadow-md shadow-red-600/20 rounded-xl uppercase text-xs tracking-wider"
+            >
+              Save Staff Assignment
+            </button>
+          </form>
         </div>
       )}
 
       {/* 5. Payments Tab */}
       {activeTab === 'payments' && (
-        <div className="bg-white rounded-3xl border border-zinc-200 overflow-hidden shadow-sm p-6 space-y-4">
-          <h3 className="font-black text-black text-lg">Invoices & Subscription Settlement</h3>
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-black uppercase text-[10px]">
-                <th className="p-4">Invoice ID</th>
-                <th className="p-4">Plan Amount</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Reference ID</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-200 font-medium">
-              <tr>
-                <td className="p-4 font-black text-black">INV-2026-9012</td>
-                <td className="p-4 font-bold text-black">₹3,499 / mo</td>
-                <td className="p-4"><span className="px-2.5 py-0.5 bg-red-50 text-red-600 font-black rounded-full text-[10px]">PAID</span></td>
-                <td className="p-4 font-mono font-bold text-red-600">{custRefId}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="bg-white rounded-3xl p-8 border border-zinc-200 shadow-sm space-y-6 max-w-xl">
+          <h3 className="font-black text-black text-lg border-b border-zinc-100 pb-3">Billing & Payment Invoices</h3>
+          <div className="p-5 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-3 text-xs">
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-zinc-600">Active Subscription:</span>
+              <span className="font-black text-black">{activePlanDef.name}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-zinc-600">Payment Status:</span>
+              <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 font-black rounded-md text-[10px] uppercase">PAID & ACTIVE</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-zinc-600">Monthly Billing:</span>
+              <span className="font-mono font-black text-red-600">₹{activePlanDef.monthlyPrice}/month</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📱 INTERACTIVE AD MOCKUP SIMULATOR MODAL */}
+      {fullPreviewAd && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-4 border border-zinc-200 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-zinc-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase text-red-600 tracking-wider">Interactive Multi-App Simulator</span>
+                <h3 className="font-black text-black text-lg">{fullPreviewAd.headline}</h3>
+              </div>
+              <button 
+                onClick={() => setFullPreviewAd(null)}
+                className="p-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-black border border-zinc-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex justify-center py-2">
+              <AppPlatformAdMockup
+                mediaUrl={fullPreviewAd.mediaUrl}
+                isVideo={isVideoMedia(fullPreviewAd.mediaUrl, fullPreviewAd.adType)}
+                brandName={fullPreviewAd.brandName}
+                headline={fullPreviewAd.headline}
+                description={fullPreviewAd.description}
+                productName={fullPreviewAd.productName || 'Featured Product'}
+                ctaText={fullPreviewAd.cta || "I'm Interested"}
+                initialFormat={fullPreviewAd.format || 'INSTAGRAM_POST'}
+                allowFormatSwitching={true}
+              />
+            </div>
+          </div>
         </div>
       )}
 

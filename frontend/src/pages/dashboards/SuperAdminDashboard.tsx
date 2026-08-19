@@ -33,11 +33,56 @@ export default function SuperAdminDashboard() {
     loadDashboardData();
   }, []);
 
+  // Dynamic relative time calculator
+  const formatRelativeTime = (item: any): string => {
+    let timestamp: number | null = null;
+
+    if (item.createdAt) {
+      timestamp = new Date(item.createdAt).getTime();
+    } else if (item.createdDate) {
+      timestamp = new Date(item.createdDate).getTime();
+    } else if (item.timestamp) {
+      timestamp = typeof item.timestamp === 'number' ? item.timestamp : new Date(item.timestamp).getTime();
+    } else if (item.freeAdClaimedAt) {
+      timestamp = new Date(item.freeAdClaimedAt).getTime();
+    } else if (typeof item._id === 'string' && (item._id.startsWith('cust-') || item._id.startsWith('lead-') || item._id.startsWith('trial-') || item._id.startsWith('user-'))) {
+      const parsed = parseInt(item._id.split('-')[1]);
+      if (!isNaN(parsed) && parsed > 1600000000000) {
+        timestamp = parsed;
+      }
+    }
+
+    if (!timestamp || isNaN(timestamp)) {
+      return 'Recently';
+    }
+
+    const diffMs = Date.now() - timestamp;
+    if (diffMs < 0 || diffMs < 60 * 1000) return 'Just now';
+    
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHours = Math.floor(diffMin / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    const diffWeeks = Math.floor(diffDays / 7);
+    const diffMonths = Math.floor(diffDays / 30);
+
+    if (diffMin < 60) return `${diffMin} min${diffMin > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffWeeks < 4) return `${diffWeeks} week${diffWeeks > 1 ? 's' : ''} ago`;
+    if (diffMonths < 12) return `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`;
+    return new Date(timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
   const loadDashboardData = () => {
     const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
 
     // 1. Calculate B2C Customers (Paid & Active)
-    const b2cUsers = mockUsers.filter((u: any) => u.role === 'CUSTOMER' || u.accountType === 'B2C');
+    const b2cUsers = mockUsers.filter((u: any) => 
+      (u.role === 'CUSTOMER' || u.accountType === 'B2C' || u.paymentStatus === 'PAID') &&
+      u.status !== 'LEAD' && u.paymentStatus !== 'PENDING'
+    );
     setB2cCount(b2cUsers.length);
 
     // 2. Calculate Leads who generated their 1 Free Ad
@@ -45,11 +90,11 @@ export default function SuperAdminDashboard() {
     setFreeAdCount(freeAdUsers.length);
 
     // 3. Calculate Pending Leads in Pipeline
-    const pendingLeads = mockUsers.filter((u: any) => u.status === 'LEAD' && u.role !== 'CUSTOMER');
+    const pendingLeads = mockUsers.filter((u: any) => (u.status === 'LEAD' || u.paymentStatus === 'PENDING' || u.customerType === 'EXPLORER') && u.role !== 'CUSTOMER');
     setLeadsCount(pendingLeads.length);
 
     // 4. Calculate Staff Employees
-    const staff = mockUsers.filter((u: any) => u.role === 'EMPLOYEE' || u.role === 'MANAGER' || u.role === 'SUPPORT');
+    const staff = mockUsers.filter((u: any) => u.role === 'EMPLOYEE' || u.role === 'MANAGER' || u.role === 'SUPPORT' || u.role === 'DESIGNER');
     setEmployeesCount(staff.length);
 
     // 5. Calculate Revenue (₹3,499 average per B2C subscriber)
@@ -69,7 +114,7 @@ export default function SuperAdminDashboard() {
         type: 'PAYMENT',
         title: `Customer Subscribed: ${cust.firstName || cust.name || 'Client'}`,
         desc: `Paid for ${cust.subscription || 'B2C Growth'} plan. Active B2C workspace unlocked.`,
-        time: `${i * 12 + 4} mins ago`,
+        time: formatRelativeTime(cust),
         badge: 'PAID SUBSCRIBER',
         refId: cust.referenceId || `CUST-REF-${cust._id?.slice(-6) || 'PENDING'}`
       });
@@ -82,7 +127,7 @@ export default function SuperAdminDashboard() {
         type: 'FREE_AD',
         title: `1st Free Ad Generated: ${lead.name || lead.email}`,
         desc: `Rendered 1-time studio ad for ${lead.companyName || 'Brand Product'}.`,
-        time: `${(i + 1) * 25} mins ago`,
+        time: formatRelativeTime(lead),
         badge: 'TRIAL CLAIMED',
         refId: lead.referenceId || `LEAD-REF-${lead._id?.slice(-6) || 'PENDING'}`
       });

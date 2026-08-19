@@ -4,10 +4,59 @@ import { useNavigate, Link } from 'react-router-dom';
 import { logOut, setCredentials } from '../../features/auth/authSlice';
 import { 
   Sparkles, Image, Video, Lock, ArrowRight, 
-  LayoutDashboard, ShoppingBag, Send, 
+  LayoutDashboard, ShoppingBag, 
   Film, Share2, Users, CreditCard, User, LogOut, Flame,
-  Upload, Link2, Plus, Check, Eye, Trash2, Globe, X
+  Upload, Link2, Plus, Check, Eye, Trash2, X, ArrowLeft,
+  Play
 } from 'lucide-react';
+import { getPlanConfig } from '../../constants/subscriptionPlans';
+import { AppPlatformAdMockup } from '../ads/AppPlatformAdMockup';
+
+export const SAMPLE_VIDEO_PRESETS = [
+  {
+    id: 'footwear-motion',
+    name: '👟 Footwear Kinetic Motion Reel',
+    category: 'Footwear',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    thumbnail: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&fit=crop'
+  },
+  {
+    id: 'tech-product-spin',
+    name: '🎧 Tech & Audio Showcase Video',
+    category: 'Electronics',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
+    thumbnail: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&fit=crop'
+  },
+  {
+    id: 'apparel-streetwear',
+    name: '🧥 Streetwear Fashion Promo Clip',
+    category: 'Apparel',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
+    thumbnail: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800&fit=crop'
+  },
+  {
+    id: 'fitness-dynamic',
+    name: '🔥 Fitness & Performance Reel',
+    category: 'Fitness',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4',
+    thumbnail: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=800&fit=crop'
+  },
+  {
+    id: 'cinematic-brand',
+    name: '✨ Cinematic 4K Brand Commercial',
+    category: 'General',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    thumbnail: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?w=800&fit=crop'
+  }
+];
+
+export const isVideoMedia = (url?: string, adType?: string, mediaType?: string) => {
+  if (adType === 'Video' || adType === 'VIDEO') return true;
+  if (mediaType === 'VIDEO') return true;
+  if (!url) return false;
+  const clean = url.toLowerCase().split('?')[0];
+  return clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov') || clean.endsWith('.m4v') || clean.includes('gtv-videos-bucket') || clean.includes('video');
+};
 
 
 interface AdRequest {
@@ -48,10 +97,10 @@ export interface B2CPost {
 }
 
 export interface SocialAccountCredential {
-  platform: 'Instagram' | 'Facebook' | 'TikTok' | 'YouTube' | 'Twitter';
+  platform: 'Instagram' | 'Facebook' | 'WhatsApp';
   handle: string;
   accountId: string;
-  accessToken: string;
+  accessToken?: string;
   isConnected: boolean;
   connectedAt?: string;
 }
@@ -62,40 +111,24 @@ const SOCIAL_CHANNELS = [
     name: 'Instagram',
     badge: '📷 Instagram',
     color: 'bg-pink-50 text-pink-600 border-pink-200',
-    setupHint: 'Instagram Business Account ID + Long-lived Access Token from Meta for Developers',
+    setupHint: 'Enter your Instagram Handle or Account ID (e.g. @yourbrand or 178414...)',
     apiSupported: true
   },
   {
     id: 'Facebook' as const,
-    name: 'Facebook',
-    badge: '👥 Facebook',
+    name: 'Facebook Page',
+    badge: '👥 Facebook Page',
     color: 'bg-blue-50 text-blue-600 border-blue-200',
-    setupHint: 'Facebook Page ID + Page Access Token from Meta Business Suite',
+    setupHint: 'Enter your Facebook Page ID or URL (e.g. fb.com/yourbrand or 109283...)',
     apiSupported: true
   },
   {
-    id: 'TikTok' as const,
-    name: 'TikTok',
-    badge: '🎵 TikTok',
-    color: 'bg-zinc-100 text-black border-zinc-300',
-    setupHint: 'TikTok for Developers — requires separate app review',
-    apiSupported: false
-  },
-  {
-    id: 'YouTube' as const,
-    name: 'YouTube Shorts',
-    badge: '🔴 YouTube Shorts',
-    color: 'bg-red-50 text-red-600 border-red-200',
-    setupHint: 'YouTube Data API v3 — requires separate Google Cloud project',
-    apiSupported: false
-  },
-  {
-    id: 'Twitter' as const,
-    name: 'X / Twitter',
-    badge: '✖️ X / Twitter',
-    color: 'bg-zinc-100 text-zinc-800 border-zinc-300',
-    setupHint: 'X Developer App — requires Elevated/Pro access tier',
-    apiSupported: false
+    id: 'WhatsApp' as const,
+    name: 'WhatsApp Channel',
+    badge: '💬 WhatsApp Channel',
+    color: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+    setupHint: 'Enter your WhatsApp Channel ID or Business Phone Number (e.g. +91 98765 43210)',
+    apiSupported: true
   }
 ];
 
@@ -139,8 +172,8 @@ export default function B2CDashboardLayout() {
   const [reqPurpose, setReqPurpose] = useState('Product Promotion');
   const [reqDesc, setReqDesc] = useState('');
   const [reqHeadline, setReqHeadline] = useState('');
-  const [reqCta] = useState('Shop Now');
-  const [reqMaxWords] = useState(60);
+  const [reqCta] = useState("I'm Interested");
+  const [reqMaxWords, setReqMaxWords] = useState(120);
   const [reqStyle, setReqStyle] = useState('Modern');
   const [reqFormat, setReqFormat] = useState('Instagram Post (1:1)');
 
@@ -151,6 +184,7 @@ export default function B2CDashboardLayout() {
   // Admin-Only Creator Modal State
   const [isAdminCreatingAd, setIsAdminCreatingAd] = useState<null | 'IMAGE' | 'VIDEO'>(null);
   const [adminHeadline, setAdminHeadline] = useState('');
+  const [adminDesc, setAdminDesc] = useState('');
   const [adminImageUrl, setAdminImageUrl] = useState('https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&fit=crop');
   const [adminTargetReqId, setAdminTargetReqId] = useState('');
 
@@ -161,11 +195,78 @@ export default function B2CDashboardLayout() {
   const [postCaption, setPostCaption] = useState('');
   const [postMediaUrl, setPostMediaUrl] = useState('');
   const [postMediaType, setPostMediaType] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
-  const [postChannels, setPostChannels] = useState<string[]>(['Instagram', 'Facebook']);
-  const [postTargetUrl, setPostTargetUrl] = useState('https://yourbrand.com');
+  const [postChannels, setPostChannels] = useState<string[]>(['Instagram', 'Facebook', 'WhatsApp']);
+  const [postTargetUrl] = useState('');
+
+  // "I'm Interested" Lead Capture Modal & State
+  const [interestedModalAd, setInterestedModalAd] = useState<AdRequest | B2CPost | null>(null);
+  
+  // Fullscreen Live Video Player & Interactive Ad Inspection Modal
+  const [fullPreviewVideoAd, setFullPreviewVideoAd] = useState<{
+    mediaUrl: string;
+    adType: 'Image' | 'Video' | 'Both' | string;
+    headline: string;
+    description: string;
+    brandName: string;
+    format?: string;
+    version?: number;
+    productName?: string;
+  } | null>(null);
+  const [leadName, setLeadName] = useState('');
+  const [leadPhone, setLeadPhone] = useState('');
+  const [leadEmail, setLeadEmail] = useState('');
+  const [capturedLeads, setCapturedLeads] = useState<any[]>([]);
+
+  // Load Captured Leads for this user
+  useEffect(() => {
+    if (!user) return;
+    const userKey = user._id || user.email || 'b2c-default';
+    const savedLeads = localStorage.getItem(`b2c_leads_${userKey}`);
+    if (savedLeads) {
+      try { setCapturedLeads(JSON.parse(savedLeads)); } catch { setCapturedLeads([]); }
+    }
+  }, [user]);
+
+  const handleCaptureLeadSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leadName || !leadPhone || !leadEmail) {
+      alert("Please enter Name, Phone Number, and Email.");
+      return;
+    }
+    const newLead = {
+      id: `LEAD-${Date.now().toString().slice(-4)}`,
+      name: leadName,
+      phone: leadPhone,
+      email: leadEmail,
+      adName: (interestedModalAd as any)?.headline || (interestedModalAd as any)?.productName || productName || 'Ad Creative',
+      capturedAt: new Date().toLocaleString()
+    };
+    const updatedLeads = [newLead, ...capturedLeads];
+    setCapturedLeads(updatedLeads);
+    const userKey = user._id || user.email || 'b2c-default';
+    localStorage.setItem(`b2c_leads_${userKey}`, JSON.stringify(updatedLeads));
+
+    // Also persist lead to mock_leads for admin overview
+    const globalLeads = JSON.parse(localStorage.getItem('mock_leads') || '[]');
+    globalLeads.unshift({
+      _id: newLead.id,
+      name: leadName,
+      email: leadEmail,
+      phone: leadPhone,
+      companyName: brandName || 'B2C Client',
+      status: 'INTERESTED',
+      createdAt: new Date().toISOString()
+    });
+    localStorage.setItem('mock_leads', JSON.stringify(globalLeads));
+
+    setLeadName(''); setLeadPhone(''); setLeadEmail('');
+    setInterestedModalAd(null);
+    alert("🎉 Lead details captured and saved! Check your Captured Leads tab.");
+  };
   const [postScheduleType, setPostScheduleType] = useState<'NOW' | 'LATER'>('NOW');
   const [postScheduledDate, setPostScheduledDate] = useState('');
   const [selectedAdForPost, setSelectedAdForPost] = useState<AdRequest | null>(null);
+  const [postStep, setPostStep] = useState<1 | 2>(1);
   const [previewingPost, setPreviewingPost] = useState<B2CPost | null>(null);
   const [selectedChannelFilter, setSelectedChannelFilter] = useState('ALL');
   const [isPublishing, setIsPublishing] = useState(false);
@@ -190,23 +291,87 @@ export default function B2CDashboardLayout() {
       return;
     }
     const userKey = user._id || user.email || 'b2c-default';
-    const savedRequests = localStorage.getItem(`requests_${userKey}`);
+    let loaded: AdRequest[] = [];
+    
+    const savedRequests = localStorage.getItem(`requests_${userKey}`) || 
+                          localStorage.getItem(`requests_${user.email}`) || 
+                          localStorage.getItem(`requests_${user.referenceId}`);
     if (savedRequests) {
       try {
-        setAdRequests(JSON.parse(savedRequests));
+        loaded = JSON.parse(savedRequests);
       } catch {
-        setAdRequests([]);
+        loaded = [];
       }
-    } else {
-      setAdRequests([]);
     }
+
+    // Also merge from all_b2c_requests where admin may have created or updated creatives
+    try {
+      const allGlobal = JSON.parse(localStorage.getItem('all_b2c_requests') || '[]');
+      const userGlobal = allGlobal.filter((r: any) => 
+        (r.userEmail && r.userEmail.toLowerCase() === user.email?.toLowerCase()) ||
+        (r.userId && (r.userId === user._id || r.userId === user.id)) ||
+        (r.customerRefId && (r.customerRefId === user.referenceId || r.customerRefId === userKey))
+      );
+
+      if (userGlobal.length > 0) {
+        // Merge userGlobal and loaded, prioritizing updated records
+        userGlobal.forEach((ug: any) => {
+          const idx = loaded.findIndex(l => l.id === ug.id || (l.productName === ug.productName && l.headline === ug.headline));
+          if (idx !== -1) {
+            loaded[idx] = { ...loaded[idx], ...ug };
+          } else {
+            loaded.unshift(ug);
+          }
+        });
+      }
+    } catch (e) {
+      console.warn("Could not scan all_b2c_requests:", e);
+    }
+
+    setAdRequests(loaded);
   }, [user]);
 
   const saveRequests = (updated: AdRequest[]) => {
     if (!user) return;
     const userKey = user._id || user.email || 'b2c-default';
     setAdRequests(updated);
-    localStorage.setItem(`requests_${userKey}`, JSON.stringify(updated));
+    try {
+      localStorage.setItem(`requests_${userKey}`, JSON.stringify(updated));
+      if (user._id) localStorage.setItem(`requests_${user._id}`, JSON.stringify(updated));
+      if (user.email) localStorage.setItem(`requests_${user.email}`, JSON.stringify(updated));
+      if (user.referenceId) localStorage.setItem(`requests_${user.referenceId}`, JSON.stringify(updated));
+    } catch (err) {
+      console.warn("localStorage QuotaExceededError! Cleaning base64 images:", err);
+      const cleaned = updated.map(r => ({
+        ...r,
+        productImages: (r.productImages || []).map(img => 
+          img.startsWith('data:') ? 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&fit=crop' : img
+        )
+      }));
+      try {
+        localStorage.setItem(`requests_${userKey}`, JSON.stringify(cleaned));
+      } catch (e2) {
+        console.error("Failed to store cleaned requests:", e2);
+      }
+    }
+
+    // Also update in all_b2c_requests so Super Admin panel instantly sees requests
+    const allGlobal = JSON.parse(localStorage.getItem('all_b2c_requests') || '[]');
+    const otherReqs = allGlobal.filter((r: any) => 
+      r.userId !== user._id && r.userEmail?.toLowerCase() !== user.email?.toLowerCase()
+    );
+    const taggedUpdated = updated.map(r => ({
+      ...r,
+      userId: user._id,
+      userEmail: user.email,
+      customerRefId: user.referenceId,
+      customerName: user.name || user.firstName || 'B2C Client'
+    }));
+    try {
+      localStorage.setItem('all_b2c_requests', JSON.stringify([...taggedUpdated, ...otherReqs]));
+    } catch (e) {
+      console.warn("Failed to update all_b2c_requests:", e);
+    }
   };
 
   // Load posts specific to this customer ONLY
@@ -231,19 +396,19 @@ export default function B2CDashboardLayout() {
       setPostHeadline(ad.headline);
       setPostMediaUrl(ad.creativeUrl || '');
       setPostMediaType(ad.adType === 'Video' ? 'VIDEO' : 'IMAGE');
-      setPostCaption(`🔥 ${ad.headline}\n\nMeet the all-new ${productName} by ${brandName}! ${ad.description}\n\n✨ Tap to shop official collection:\n👉 ${user?.website || 'https://' + (brandName || 'brand').toLowerCase().replace(/\s+/g, '') + '.com'}\n\n#${(brandName || 'brand').replace(/\s+/g, '')} #${(productCat || 'Product').replace(/\s+/g, '')} #DropAlert`);
+      setPostCaption(`🔥 ${ad.headline}\n\nMeet the all-new ${productName} by ${brandName}! ${ad.description}\n\n👉 Click "I'm Interested" below to get details and claim exclusive offer!\n\n#${(brandName || 'brand').replace(/\s+/g, '')} #${(productCat || 'Product').replace(/\s+/g, '')} #DropAlert`);
     } else {
       setSelectedAdForPost(null);
       const firstCreative = adRequests.find(r => r.creativeUrl);
       setPostHeadline(`${brandName || 'Brand'} — ${productName || 'Exclusive Product'}`);
       setPostMediaUrl(firstCreative?.creativeUrl || user?.mainProduct?.mediaUrl || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&fit=crop');
       setPostMediaType('IMAGE');
-      setPostCaption(`🔥 Special Launch: ${productName} by ${brandName}!\n\nEngineered for maximum style and performance.\n\n👉 Shop Now: ${user?.website || 'https://yourbrand.com'}\n\n#${(brandName || 'Brand').replace(/\s+/g, '')} #NewDrop`);
+      setPostCaption(`🔥 Special Launch: ${productName} by ${brandName}!\n\nEngineered for maximum style and performance.\n\n👉 Click "I'm Interested" to connect with us!\n\n#${(brandName || 'Brand').replace(/\s+/g, '')} #NewDrop`);
     }
-    setPostChannels(['Instagram', 'TikTok', 'Facebook']);
-    setPostTargetUrl(user?.website || 'https://yourbrand.com');
+    setPostChannels(['Instagram', 'Facebook', 'WhatsApp']);
     setPostScheduleType('NOW');
     setPostScheduledDate(new Date(Date.now() + 86400000).toISOString().slice(0, 16));
+    setPostStep(1);
     setIsPostingModalOpen(true);
   };
 
@@ -393,8 +558,35 @@ export default function B2CDashboardLayout() {
 
 
 
-  // CustomerType & Lead Guards
+  // CustomerType & Admin Access Guards (Private to Customer Credentials Only)
   const customerType = user?.customerType || 'EXPLORER';
+
+  if (user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') {
+    return (
+      <div className="min-h-[80vh] bg-white text-black flex items-center justify-center p-6 font-sans">
+        <div className="max-w-lg w-full bg-white rounded-3xl border border-zinc-200 p-8 sm:p-10 shadow-2xl text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-red-50 text-red-600 border border-red-200 flex items-center justify-center mx-auto shadow-sm">
+            <Lock className="w-8 h-8 text-red-600" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-black font-display">Client Workspace Protected</h2>
+            <p className="text-xs text-zinc-600 font-medium leading-relaxed">
+              Customer creative workspaces are private and require direct client login credentials. Administrators cannot access client workspaces or create ads on their behalf without customer credentials. Please inspect and audit client assets securely inside the Admin Center.
+            </p>
+          </div>
+          <div className="pt-2">
+            <Link
+              to="/admin/b2c"
+              className="btn-shimmer w-full py-4 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl uppercase text-xs tracking-wider flex items-center justify-center gap-2 shadow-md shadow-red-600/20"
+            >
+              <span>Return to Admin B2C Manager</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!user || customerType === 'EXPLORER') {
     return (
@@ -527,27 +719,67 @@ export default function B2CDashboardLayout() {
     dispatch(setCredentials({ user: updatedUser, token: 'mock-jwt-token' }));
 
     const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    const idx = mockUsers.findIndex((u: any) => u.email === user.email || u._id === user._id);
+    const idx = mockUsers.findIndex((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase() || u._id === user._id);
     if (idx !== -1) {
-      mockUsers[idx] = updatedUser;
+      mockUsers[idx] = { ...mockUsers[idx], ...updatedUser };
       localStorage.setItem('mock_users', JSON.stringify(mockUsers));
     }
     alert("Product profile saved successfully for your account!");
   };
 
 
-  const handleMultiImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMultiImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    const formData = new FormData();
+    let validCount = 0;
+    Array.from(files).forEach((file) => {
+      if (file.type.startsWith('image/')) {
+        formData.append('files', file);
+        validCount++;
+      }
+    });
+
+    if (validCount === 0) return;
+
+    try {
+      const res = await fetch('http://localhost:3000/api/upload/files', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.urls)) {
+        setReqUploadedImages(prev => [...prev, ...data.urls]);
+        return;
+      }
+    } catch (err) {
+      console.warn("Multer upload endpoint unavailable, using base64 converter:", err);
+    }
+
+    // Fallback base64 conversion via backend /api/upload/base64
     const newImages: string[] = [];
     let count = 0;
     Array.from(files).forEach((file) => {
       if (!file.type.startsWith('image/')) return;
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         if (typeof reader.result === 'string') {
-          newImages.push(reader.result);
+          try {
+            const res2 = await fetch('http://localhost:3000/api/upload/base64', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image: reader.result })
+            });
+            const data2 = await res2.json();
+            if (data2.url) {
+              newImages.push(data2.url);
+            } else {
+              newImages.push(reader.result);
+            }
+          } catch {
+            newImages.push(reader.result as string);
+          }
         }
         count++;
         if (count === files.length) {
@@ -575,8 +807,41 @@ export default function B2CDashboardLayout() {
       return;
     }
 
+    const planDef = getPlanConfig(user?.subscription);
+    const userSub = planDef.name;
+
+    // 1. Strict Video Ad Block check for Basic Plan
+    if (!planDef.allowVideos && (reqAdType === 'Video' || reqAdType === 'Both')) {
+      alert(`🚫 Video Ads are BLOCKED on ${userSub}. Up to ${planDef.maxProducts} products and image ads only. Please upgrade to B2C Pro or Enterprise Plan to generate video creatives.`);
+      return;
+    }
+
+    // 2. Count existing ad requests for current product
+    const currentProdRequests = adRequests.filter(r => r.productName === productName);
+    const existingImageCount = currentProdRequests.filter(r => r.adType === 'Image' || r.adType === 'Both').length;
+    const existingVideoCount = currentProdRequests.filter(r => r.adType === 'Video' || r.adType === 'Both').length;
+
+    const maxImageAllowed = user?.imageAdsPerProduct || planDef.imageAdsPerProduct;
+    const maxVideoAllowed = user?.videoAdsPerProduct || planDef.videoAdsPerProduct;
+
+    if ((reqAdType === 'Image' || reqAdType === 'Both') && existingImageCount >= maxImageAllowed) {
+      alert(`⚠️ Image Ad Request Limit Reached!\n\nYour active plan (${userSub}) allows a maximum of ${maxImageAllowed} Image Ads per product.\nYou already have ${existingImageCount} ad requests for "${productName}".\n\nPlease upgrade your plan to request more ads.`);
+      return;
+    }
+
+    if ((reqAdType === 'Video' || reqAdType === 'Both') && existingVideoCount >= maxVideoAllowed) {
+      alert(`⚠️ Video Ad Request Limit Reached!\n\nYour active plan (${userSub}) allows a maximum of ${maxVideoAllowed} Video Ads per product.\nYou already have ${existingVideoCount} video requests for "${productName}".\n\nPlease upgrade your plan to request more video ads.`);
+      return;
+    }
+
+    // Default creatives for direct generation
+    let generatedMediaUrl = reqUploadedImages[0] || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&auto=format&fit=crop&q=80';
+    if (reqAdType === 'Video') {
+      generatedMediaUrl = 'https://assets.mixkit.co/videos/preview/mixkit-running-shoes-in-motion-41885-large.mp4';
+    }
+
     const newReq: AdRequest = {
-      id: `REQ-${Date.now().toString().slice(-4)}`,
+      id: `AD-${Date.now().toString().slice(-4)}`,
       productName: productName,
       adType: reqAdType,
       purpose: reqPurpose,
@@ -586,7 +851,9 @@ export default function B2CDashboardLayout() {
       maxWords: reqMaxWords,
       style: reqStyle,
       format: reqFormat,
-      status: 'SUBMITTED',
+      creativeUrl: generatedMediaUrl,
+      creativeVersion: 1,
+      status: 'APPROVED', // Direct creation without waiting for admin
       createdDate: new Date().toISOString().split('T')[0],
       productImages: reqUploadedImages
     };
@@ -597,7 +864,8 @@ export default function B2CDashboardLayout() {
     setReqDesc('');
     setReqHeadline('');
     setReqUploadedImages([]);
-    alert(`Advertisement Request Submitted Successfully! (${reqUploadedImages.length} product photos attached). Our dedicated studio admin will generate your creative.`);
+    alert(`✨ Ad Creative Generated & Published Successfully!\n\nYour ${reqAdType} ad for "${productName}" has been created and is ready for social posting in "My Ads & Videos".`);
+    setActiveView('ads');
   };
 
 
@@ -614,7 +882,9 @@ export default function B2CDashboardLayout() {
       if (r.id === targetReq?.id) {
         return {
           ...r,
+          adType: isAdminCreatingAd === 'VIDEO' ? ('Video' as const) : ('Image' as const),
           headline: adminHeadline || r.headline,
+          description: adminDesc || r.description,
           creativeUrl: adminImageUrl,
           creativeVersion: (r.creativeVersion || 1) + 1,
           status: 'CUSTOMER_REVIEW' as const
@@ -626,6 +896,7 @@ export default function B2CDashboardLayout() {
     saveRequests(updated);
     setIsAdminCreatingAd(null);
     setAdminHeadline('');
+    setAdminDesc('');
     alert(`Admin Creation Complete!\nGenerated ${isAdminCreatingAd === 'IMAGE' ? 'Image Ad' : 'Video Ad'} for ${targetReq?.headline || 'Campaign'}.`);
   };
 
@@ -675,7 +946,7 @@ export default function B2CDashboardLayout() {
             {[
               { id: 'overview', label: 'Overview', icon: LayoutDashboard },
               { id: 'product', label: 'My Product', icon: ShoppingBag },
-              { id: 'requests', label: 'Ad Requests', icon: Send },
+              { id: 'requests', label: 'Create Ads & Videos', icon: Sparkles },
               { id: 'ads', label: 'My Ads & Videos', icon: Film },
               { id: 'posts', label: 'Platform Posts', icon: Share2 },
               { id: 'leads', label: 'Captured Leads', icon: Users },
@@ -744,11 +1015,17 @@ export default function B2CDashboardLayout() {
                 </p>
               </div>
 
-              {/* Top Reference Badges */}
-              <div className="flex items-center gap-2">
-                <div className="px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-right">
-                  <div className="text-[9px] uppercase font-bold text-zinc-400">Assigned Specialist</div>
-                  <div className="text-xs font-mono font-black text-black">{employeeRefId}</div>
+              {/* Top Reference & Support Badges */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="px-4 py-2 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-red-600 text-white font-black flex items-center justify-center text-xs shadow-sm">
+                    {(user?.assignedEmployeeName || 'Sarah Jenkins').split(' ').map((n: string) => n[0]).join('')}
+                  </div>
+                  <div>
+                    <div className="text-[9px] uppercase font-black text-red-600 tracking-wider">Assigned Account Specialist</div>
+                    <div className="text-xs font-black text-black">{user?.assignedEmployeeName || 'Sarah Jenkins'}</div>
+                    <div className="text-[10px] font-mono font-bold text-zinc-500">Ref ID: {employeeRefId}</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -880,12 +1157,88 @@ export default function B2CDashboardLayout() {
         )}
 
         {/* 3. Ad Requests Form */}
-        {activeView === 'requests' && (
+        {activeView === 'requests' && (() => {
+          const planDef = getPlanConfig(user?.subscription);
+          const userSub = planDef.name;
+          const currentProdRequests = adRequests.filter(r => r.productName === productName);
+          const existingImageCount = currentProdRequests.filter(r => r.adType === 'Image' || r.adType === 'Both').length;
+          const maxImageAllowed = user?.imageAdsPerProduct || planDef.imageAdsPerProduct;
+          const isLimitReached = existingImageCount >= maxImageAllowed;
+          const usagePercent = Math.min(100, Math.round((existingImageCount / maxImageAllowed) * 100));
+
+          return (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 bg-white rounded-3xl p-8 border border-zinc-200 shadow-sm space-y-6">
-              <h2 className="text-2xl font-black text-black font-display border-b border-zinc-100 pb-3">
-                Submit Advertisement Request
-              </h2>
+              
+              {/* Plan Quota & Limit Tracker Banner */}
+              <div className={`p-5 rounded-2xl border transition-all ${
+                isLimitReached 
+                  ? 'bg-red-50 border-red-200 text-red-900' 
+                  : 'bg-zinc-50 border-zinc-200 text-black'
+              }`}>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 bg-white border border-zinc-200 text-red-600 font-black text-[10px] uppercase rounded-md">
+                        {userSub}
+                      </span>
+                      <span className="font-bold text-xs">
+                        Product: <strong className="text-black font-black">{productName || 'Flagship Product'}</strong>
+                      </span>
+                    </div>
+                    <div className="text-xs font-semibold mt-1">
+                      Ad Creatives Used: <strong className="font-black">{existingImageCount}</strong> of <strong className="font-black">{maxImageAllowed}</strong> Allowed
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold">{usagePercent}% Used</span>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/pricing')}
+                      className="px-3 py-1.5 bg-black hover:bg-zinc-800 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-sm transition-all"
+                    >
+                      Upgrade Plan ⚡
+                    </button>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="w-full bg-zinc-200 h-2 rounded-full mt-3 overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-500 ${isLimitReached ? 'bg-red-600' : 'bg-green-600'}`}
+                    style={{ width: `${usagePercent}%` }}
+                  />
+                </div>
+
+                {isLimitReached && (
+                  <div className="mt-3 p-3 bg-red-100/80 border border-red-300 rounded-xl text-xs font-bold text-red-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div>
+                      ⚠️ You have already met your subscription plan limit ({existingImageCount}/{maxImageAllowed} ads for this product). To create more ads, please choose a higher plan.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/pricing')}
+                      className="btn-shimmer px-4 py-1.5 bg-red-600 text-white font-black uppercase text-[10px] rounded-lg tracking-wider shrink-0"
+                    >
+                      Choose Plans & Upgrade
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-b border-zinc-100 pb-3">
+                <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-red-50 text-red-600 text-[10px] font-black uppercase tracking-wider mb-1">
+                  <Sparkles className="w-3 h-3" />
+                  <span>Direct Creator Studio</span>
+                </div>
+                <h2 className="text-2xl font-black text-black font-display">
+                  Create Ads & Videos
+                </h2>
+                <p className="text-xs text-zinc-500 font-medium mt-0.5">
+                  Generate image banners and video motion ads directly into your creative library with 1 click.
+                </p>
+              </div>
               <form onSubmit={handleCreateRequest} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -899,10 +1252,13 @@ export default function B2CDashboardLayout() {
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Platform Format</label>
                     <select value={reqFormat} onChange={e => setReqFormat(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600">
-                      <option value="Instagram Post (1:1)">Instagram Post (1:1)</option>
-                      <option value="TikTok / Reel (9:16)">TikTok / Reel (9:16)</option>
-                      <option value="Facebook Story (9:16)">Facebook Story (9:16)</option>
-                      <option value="YouTube Short (9:16)">YouTube Short (9:16)</option>
+                      <option value="Instagram Post (1:1)">📸 Instagram Post (1:1 Square)</option>
+                      <option value="Instagram Reel / Story (9:16)">📱 Instagram Reel / Story (9:16 Vertical)</option>
+                      <option value="YouTube Shorts (9:16)">▶️ YouTube Shorts (9:16 Vertical)</option>
+                      <option value="YouTube Video Ad (16:9)">🖥️ YouTube Video Ad (16:9 Widescreen)</option>
+                      <option value="TikTok Video (9:16)">🎵 TikTok Video (9:16 Vertical)</option>
+                      <option value="Facebook Feed (4:5)">👥 Facebook Feed (4:5 Post)</option>
+                      <option value="X (Twitter) Feed (16:9)">𝕏 X / Twitter Feed (16:9)</option>
                     </select>
                   </div>
                 </div>
@@ -931,9 +1287,63 @@ export default function B2CDashboardLayout() {
                   <input type="text" value={reqHeadline} onChange={e => setReqHeadline(e.target.value)} placeholder="e.g. FLASH SALE: 25% OFF" className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600" />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Advertisement Copy Details & Instructions *</label>
-                  <textarea required value={reqDesc} onChange={e => setReqDesc(e.target.value)} placeholder="Provide special bullet points, colors, or offers..." className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black h-20 resize-none focus:outline-none focus:border-red-600" />
+                {/* Word Count Limit & Ad Copy Studio */}
+                <div className="space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600">
+                      Ad Copy & Marketing Text *
+                    </label>
+                    
+                    {/* Add More Words Button & Word Count Selector */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const expanded = `🔥 EXCLUSIVE LAUNCH OFFER: Elevate your lifestyle with ${productName || 'our premium collection'} by ${brandName || 'Official Brand'}!\n\n✨ Why You'll Love It:\n• 🚀 Precision Performance: Engineered for maximum durability & superior daily comfort.\n• 🌿 Ultra-Responsive Design: Crafted with premium materials for all-day use.\n• 🛡️ 100% Risk-Free Guarantee: Full warranty with 30-day effortless returns.\n• ⚡ Fast Insured Shipping: Delivered straight to your doorstep with live tracking.\n\n🎁 Special Promo: Claim an instant 25% discount today! Tap "I'm Interested" below to claim your offer before inventory runs out.`;
+                          setReqDesc(expanded);
+                          setReqMaxWords(150);
+                        }}
+                        className="btn-shimmer px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-black rounded-lg border border-red-200 transition-all flex items-center gap-1 shadow-sm"
+                        title="Click to generate long-form high-converting promotional copy"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>✨ Add More Words (Auto-Expand)</span>
+                      </button>
+
+                      <div className="flex items-center gap-1 bg-zinc-100 px-2 py-0.5 rounded-lg text-[10px] font-bold text-zinc-600">
+                        <span>Limit:</span>
+                        <select
+                          value={reqMaxWords}
+                          onChange={e => setReqMaxWords(Number(e.target.value))}
+                          className="bg-transparent font-black text-black text-[10px] focus:outline-none cursor-pointer"
+                        >
+                          <option value={30}>30w (Short & Punchy)</option>
+                          <option value={60}>60w (Standard)</option>
+                          <option value={120}>120w (Detailed Story)</option>
+                          <option value={250}>250w (Long Copy)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <textarea 
+                    required 
+                    value={reqDesc} 
+                    onChange={e => setReqDesc(e.target.value)} 
+                    rows={4}
+                    placeholder="Provide special bullet points, product benefits, offers, or click '✨ Add More Words' to auto-generate long copy..." 
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-medium text-xs text-black resize-y focus:outline-none focus:border-red-600 leading-relaxed" 
+                  />
+
+                  {/* Word Count Live Counter */}
+                  <div className="flex justify-between items-center text-[10px] text-zinc-400 font-bold px-1">
+                    <span>
+                      Length: <strong className={reqDesc.trim().split(/\s+/).filter(Boolean).length > reqMaxWords ? 'text-amber-600' : 'text-zinc-700'}>
+                        {reqDesc.trim() ? reqDesc.trim().split(/\s+/).filter(Boolean).length : 0}
+                      </strong> / {reqMaxWords} words
+                    </span>
+                    <span className="text-zinc-400 font-medium">Use '✨ Add More Words' to instantly expand into long storytelling copy</span>
+                  </div>
                 </div>
 
                 {/* Multi-Image Upload & URL Input */}
@@ -1009,8 +1419,9 @@ export default function B2CDashboardLayout() {
                   )}
                 </div>
 
-                <button type="submit" className="btn-shimmer w-full py-4 bg-red-600 text-white font-black hover:bg-red-700 shadow-md shadow-red-600/20 rounded-xl uppercase text-xs tracking-wider">
-                  Submit Ad Request to Studio
+                <button type="submit" className="btn-shimmer w-full py-4 bg-red-600 text-white font-black hover:bg-red-700 shadow-md shadow-red-600/20 rounded-xl uppercase text-xs tracking-wider flex items-center justify-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  <span>Generate & Publish Ad Creative Now</span>
                 </button>
 
               </form>
@@ -1032,7 +1443,29 @@ export default function B2CDashboardLayout() {
                     
                     {req.status === 'CUSTOMER_REVIEW' && req.creativeUrl && (
                       <div className="pt-2 space-y-2">
-                        <img src={req.creativeUrl} alt="Preview" className="w-full h-24 object-cover rounded-xl border border-zinc-200" />
+                        {isVideoMedia(req.creativeUrl, req.adType) ? (
+                          <div 
+                            onClick={() => setFullPreviewVideoAd({
+                              mediaUrl: req.creativeUrl || '',
+                              adType: req.adType,
+                              headline: req.headline,
+                              description: req.description,
+                              brandName: brandName || 'Brand Partner',
+                              format: req.format,
+                              version: req.creativeVersion || 1,
+                              productName: req.productName
+                            })}
+                            className="relative group cursor-pointer aspect-video rounded-xl overflow-hidden bg-black border border-zinc-200"
+                          >
+                            <video src={req.creativeUrl} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-1.5 text-white text-[10px] font-black uppercase tracking-wider backdrop-blur-[1px]">
+                              <Play className="w-3.5 h-3.5 fill-white" />
+                              <span>▶ Watch Video Ad</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <img src={req.creativeUrl} alt="Preview" className="w-full h-24 object-cover rounded-xl border border-zinc-200" />
+                        )}
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleCreativeAction(req.id, 'APPROVE')}
@@ -1054,7 +1487,8 @@ export default function B2CDashboardLayout() {
               </div>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* 4. My Ads & Videos Grid (WITH ADMIN-ONLY CREATION BUTTONS) */}
         {activeView === 'ads' && (
@@ -1074,6 +1508,7 @@ export default function B2CDashboardLayout() {
                     onClick={() => {
                       setIsAdminCreatingAd('IMAGE');
                       setAdminTargetReqId(adRequests[0]?.id || '');
+                      setAdminImageUrl('https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&fit=crop');
                     }}
                     className="btn-shimmer px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl uppercase text-xs tracking-wider flex items-center gap-2 shadow-md shadow-red-600/20"
                   >
@@ -1085,6 +1520,7 @@ export default function B2CDashboardLayout() {
                     onClick={() => {
                       setIsAdminCreatingAd('VIDEO');
                       setAdminTargetReqId(adRequests[0]?.id || '');
+                      setAdminImageUrl(SAMPLE_VIDEO_PRESETS[0].url);
                     }}
                     className="btn-shimmer px-4 py-3 bg-black hover:bg-zinc-900 text-white font-black rounded-xl uppercase text-xs tracking-wider flex items-center gap-2 border border-zinc-800"
                   >
@@ -1106,10 +1542,41 @@ export default function B2CDashboardLayout() {
                 {adRequests.filter(r => r.creativeUrl).map((ad) => (
                   <div key={ad.id} className="bg-white rounded-3xl border border-zinc-200 overflow-hidden shadow-sm flex flex-col justify-between group">
                     <div className="relative">
-                      <img src={ad.creativeUrl} alt="Ad creative" className="w-full h-52 object-cover group-hover:scale-105 transition-transform duration-300" />
-                      <span className="absolute top-3 right-3 px-2.5 py-1 bg-black/80 backdrop-blur-md text-white font-mono text-[10px] font-bold rounded-lg">
-                        {ad.format}
-                      </span>
+                      {isVideoMedia(ad.creativeUrl, ad.adType) ? (
+                        <div 
+                          onClick={() => setFullPreviewVideoAd({
+                            mediaUrl: ad.creativeUrl || '',
+                            adType: ad.adType,
+                            headline: ad.headline,
+                            description: ad.description,
+                            brandName: brandName || 'Brand Partner',
+                            format: ad.format,
+                            version: ad.creativeVersion || 1,
+                            productName: ad.productName
+                          })}
+                          className="relative group cursor-pointer h-52 bg-black overflow-hidden flex items-center justify-center"
+                        >
+                          <video 
+                            src={ad.creativeUrl} 
+                            autoPlay 
+                            loop 
+                            muted 
+                            playsInline 
+                            className="w-full h-full object-cover" 
+                          />
+                          <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors flex items-center justify-center">
+                            <div className="w-12 h-12 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                              <Play className="w-5 h-5 fill-white ml-0.5" />
+                            </div>
+                          </div>
+                          <span className="absolute top-3 left-3 px-2.5 py-1 bg-red-600 text-white font-black text-[9px] uppercase rounded-lg flex items-center gap-1 shadow-md">
+                            <Play className="w-2.5 h-2.5 fill-white" />
+                            <span>Video Motion Ad</span>
+                          </span>
+                        </div>
+                      ) : (
+                        <img src={ad.creativeUrl} alt="Ad creative" className="w-full h-52 object-cover group-hover:scale-105 transition-transform duration-300" />
+                      )}
                     </div>
                     <div className="p-5 space-y-3">
                       <div className="font-black text-black text-sm">{ad.headline}</div>
@@ -1294,36 +1761,47 @@ export default function B2CDashboardLayout() {
         {/* 6. Captured Leads */}
         {activeView === 'leads' && (
           <div className="bg-white rounded-3xl border border-zinc-200 overflow-hidden shadow-sm p-6 space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-black text-black text-lg">Direct Inbound Leads</h3>
-              <span className="px-3 py-1 bg-red-50 text-red-600 font-mono text-xs font-bold rounded-lg">
-                {posts.reduce((acc, p) => acc + p.leads, 0)} Total Ingested
+            <div className="flex justify-between items-center border-b border-zinc-100 pb-3">
+              <div>
+                <h3 className="font-black text-black text-lg">Captured Inbound Leads</h3>
+                <p className="text-xs text-zinc-500 font-medium mt-0.5">Prospects who clicked "I'm Interested" on your published ad creatives.</p>
+              </div>
+              <span className="px-3.5 py-1 bg-red-50 text-red-600 font-mono text-xs font-black rounded-lg border border-red-200">
+                {capturedLeads.length} Total Captured
               </span>
             </div>
-            {posts.reduce((acc, p) => acc + p.leads, 0) > 0 ? (
+            {capturedLeads.length > 0 ? (
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-black uppercase text-[10px]">
                     <th className="p-4">Lead ID</th>
-                    <th className="p-4">Ad Post Campaign</th>
-                    <th className="p-4">Channel Source</th>
-                    <th className="p-4">Status</th>
+                    <th className="p-4">Prospect Name</th>
+                    <th className="p-4">Contact Phone</th>
+                    <th className="p-4">Email Address</th>
+                    <th className="p-4">Target Ad Creative</th>
+                    <th className="p-4">Timestamp</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200 font-medium">
-                  {posts.filter(p => p.leads > 0).map((post) => (
-                    <tr key={post._id || post.id}>
-                      <td className="p-4 font-mono font-bold text-red-600">INBOUND-LEAD-{(post._id || post.id || '').slice(-4)}</td>
-                      <td className="p-4 font-bold text-black">{post.headline}</td>
-                      <td className="p-4 font-semibold text-zinc-600">{post.channels.join(', ')}</td>
-                      <td className="p-4"><span className="px-2.5 py-0.5 bg-green-50 text-green-700 font-bold rounded-full text-[10px]">VERIFIED LEAD</span></td>
+                  {capturedLeads.map((lead) => (
+                    <tr key={lead.id} className="hover:bg-zinc-50/50">
+                      <td className="p-4 font-mono font-bold text-red-600">{lead.id}</td>
+                      <td className="p-4 font-black text-black">{lead.name}</td>
+                      <td className="p-4 font-bold text-zinc-700">{lead.phone}</td>
+                      <td className="p-4 text-zinc-600">{lead.email}</td>
+                      <td className="p-4 font-semibold text-black max-w-xs truncate">{lead.adName}</td>
+                      <td className="p-4 text-[10px] text-zinc-400 font-mono">{lead.capturedAt}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ) : (
-              <div className="p-12 text-center text-zinc-500 text-xs font-medium bg-zinc-50 rounded-2xl border border-zinc-200">
-                No inbound prospect leads captured yet. Inbound prospect inquiries from your active product ads will automatically populate here.
+              <div className="p-12 text-center text-zinc-500 text-xs font-medium bg-zinc-50 rounded-2xl border border-zinc-200 space-y-2">
+                <span className="text-base block">📥</span>
+                <span className="font-black text-black block text-sm">No Leads Captured Yet</span>
+                <p className="max-w-md mx-auto text-zinc-500 text-[11px]">
+                  When potential customers click the <strong>"I'm Interested"</strong> button on your live ads, their contact details will immediately be saved here.
+                </p>
               </div>
             )}
           </div>
@@ -1380,13 +1858,43 @@ export default function B2CDashboardLayout() {
             {connectingPlatform ? (
               <div className="max-w-xl bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm space-y-6">
                 <div className="flex justify-between items-center pb-3 border-b border-zinc-100">
-                  <h3 className="font-black text-black">Connect {connectingPlatform} Account</h3>
-                  <button 
-                    onClick={() => { setConnectingPlatform(null); setConnectHandle(''); setConnectAccountId(''); setConnectToken(''); }}
-                    className="text-xs font-bold text-zinc-500 hover:text-black uppercase"
-                  >
-                    Cancel
-                  </button>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-red-600 tracking-wider">Meta Graph API Integration</span>
+                    <h3 className="font-black text-black text-lg">Connect {connectingPlatform} Account</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConnectHandle('@velocity_athletics');
+                        setConnectAccountId('17841400293847291');
+                        setConnectToken('EAAGNO41x0BA...mock_meta_instagram_graph_api_access_token');
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-[11px] font-bold border border-zinc-200 transition-colors"
+                      title="Auto-fill sample credentials for instant testing"
+                    >
+                      ✨ Auto-Fill Demo
+                    </button>
+                    <button 
+                      onClick={() => { setConnectingPlatform(null); setConnectHandle(''); setConnectAccountId(''); setConnectToken(''); }}
+                      className="text-xs font-bold text-zinc-500 hover:text-black uppercase"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-1.5 text-xs text-zinc-600">
+                  <div className="font-black text-black flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-red-600" />
+                    <span>How to get your Meta / Instagram Token:</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed">
+                    1. Go to <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer" className="text-red-600 font-bold underline">Meta Graph API Explorer ↗</a>.<br />
+                    2. Select your App & Page linked to Instagram.<br />
+                    3. Add permissions <code className="bg-zinc-200 px-1 py-0.5 rounded font-mono text-[10px]">instagram_basic</code> & <code className="bg-zinc-200 px-1 py-0.5 rounded font-mono text-[10px]">instagram_content_publish</code>.<br />
+                    4. Click <strong>Generate Access Token</strong> and paste it below.
+                  </p>
                 </div>
 
                 <form onSubmit={handleConnectAccount} className="space-y-4">
@@ -1406,39 +1914,36 @@ export default function B2CDashboardLayout() {
 
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                      Business Account / Page ID *
+                      Instagram Business Account ID *
                     </label>
                     <input 
                       type="text" 
                       required 
                       value={connectAccountId}
                       onChange={(e) => setConnectAccountId(e.target.value)}
-                      placeholder="e.g. 178414053..."
+                      placeholder="e.g. 178414053928172..."
                       className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                      API Access Token *
+                      Meta API Access Token (Graph API) *
                     </label>
                     <textarea 
                       required 
                       value={connectToken}
                       onChange={(e) => setConnectToken(e.target.value)}
                       rows={3}
-                      placeholder="e.g. EAACW5..."
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-medium text-xs text-black focus:outline-none focus:border-red-600 resize-none leading-relaxed"
+                      placeholder="e.g. EAACW5... (Starts with EAA)"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-mono text-xs text-black focus:outline-none focus:border-red-600 resize-none leading-relaxed"
                     />
-                    <p className="text-[10px] text-zinc-400 font-medium mt-1 leading-relaxed">
-                      {SOCIAL_CHANNELS.find(c => c.id === connectingPlatform)?.setupHint}
-                    </p>
                   </div>
 
                   <button 
                     type="submit" 
                     disabled={connectSaving}
-                    className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl uppercase text-xs tracking-wider transition-colors disabled:opacity-50"
+                    className="btn-shimmer w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl uppercase text-xs tracking-wider transition-all shadow-md shadow-red-600/20 disabled:opacity-50"
                   >
                     {connectSaving ? 'Saving Credential...' : `Connect ${connectingPlatform} Account`}
                   </button>
@@ -1511,13 +2016,23 @@ export default function B2CDashboardLayout() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-zinc-200 space-y-6">
             <div className="flex justify-between items-start">
-              <div>
-                <span className="px-2.5 py-1 bg-red-50 text-red-600 font-black rounded-lg text-[10px] uppercase">
-                  Super Admin Studio Tool
-                </span>
-                <h2 className="text-2xl font-black text-black font-display mt-2">
-                  Create Ad as {isAdminCreatingAd === 'IMAGE' ? 'Image Banner' : 'Video Creative'}
-                </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAdminCreatingAd(null)}
+                  className="p-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-black transition-colors flex items-center gap-1 text-xs font-bold mr-1"
+                  title="Cancel"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <div>
+                  <span className="px-2.5 py-1 bg-red-50 text-red-600 font-black rounded-lg text-[10px] uppercase">
+                    Super Admin Studio Tool
+                  </span>
+                  <h2 className="text-2xl font-black text-black font-display mt-1">
+                    Create Ad as {isAdminCreatingAd === 'IMAGE' ? 'Image Banner' : 'Video Creative'}
+                  </h2>
+                </div>
               </div>
               <button onClick={() => setIsAdminCreatingAd(null)} className="p-2 rounded-xl bg-zinc-100 text-black hover:bg-zinc-200">
                 ✕
@@ -1550,8 +2065,101 @@ export default function B2CDashboardLayout() {
                 />
               </div>
 
+              {/* Description & Ad Copy with Add More Words */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600">
+                    Ad Body Copy & Description (More Words)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const expanded = `🔥 EXCLUSIVE LAUNCH: Elevate your lifestyle with our premium edition!\n\n✨ Why You'll Love It:\n• 🚀 Precision Performance: Engineered for maximum durability & superior daily comfort.\n• 🌿 Ultra-Responsive Design: Crafted with premium materials for all-day use.\n• 🛡️ 100% Risk-Free Guarantee: Full warranty with 30-day effortless returns.\n• ⚡ Fast Express Shipping: Delivered straight to your doorstep with live tracking.\n\n🎁 Special Offer: Claim an instant 25% discount today! Tap "I'm Interested" below to claim your offer before inventory runs out.`;
+                      setAdminDesc(expanded);
+                    }}
+                    className="btn-shimmer px-2.5 py-0.5 bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-black rounded-lg border border-red-200 transition-all flex items-center gap-1"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>✨ Add More Words</span>
+                  </button>
+                </div>
+                <textarea
+                  value={adminDesc}
+                  onChange={(e) => setAdminDesc(e.target.value)}
+                  rows={3}
+                  placeholder="Enter detailed advertising copy or click '✨ Add More Words'..."
+                  className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl font-medium text-xs text-black resize-none focus:outline-none focus:border-red-600 leading-relaxed"
+                />
+              </div>
+
+              {/* Video Presets Library Selector (When Creating Video Ad) */}
+              {isAdminCreatingAd === 'VIDEO' && (
+                <div className="space-y-2 p-3 bg-red-50/60 border border-red-200 rounded-2xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-red-700 flex items-center gap-1">
+                      <Video className="w-3.5 h-3.5 text-red-600" />
+                      <span>Video Presets</span>
+                    </span>
+                    <span className="text-[9px] font-bold text-red-600">Select Template</span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                    {SAMPLE_VIDEO_PRESETS.map((vid) => (
+                      <button
+                        key={vid.id}
+                        type="button"
+                        onClick={() => setAdminImageUrl(vid.url)}
+                        className={`w-full p-2 rounded-xl text-left border flex items-center gap-2.5 transition-all ${
+                          adminImageUrl === vid.url 
+                            ? 'bg-red-600 text-white border-red-600 shadow-sm' 
+                            : 'bg-white text-black border-zinc-200 hover:border-red-300'
+                        }`}
+                      >
+                        <div className="w-7 h-7 rounded-lg overflow-hidden shrink-0 bg-black">
+                          <img src={vid.thumbnail} alt="" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[11px] font-black truncate">{vid.name}</div>
+                          <span className={`text-[9px] font-bold block ${adminImageUrl === vid.url ? 'text-red-100' : 'text-zinc-500'}`}>
+                            {vid.category} • MP4 HD
+                          </span>
+                        </div>
+                        {adminImageUrl === vid.url && (
+                          <Play className="w-3 h-3 fill-white shrink-0 mr-1" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Live Preview Box */}
+              {adminImageUrl && (
+                <div className="space-y-1.5 p-3 bg-zinc-50 border border-zinc-200 rounded-2xl">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-zinc-600 block">
+                    {isAdminCreatingAd === 'VIDEO' ? 'Live Video Preview (Running)' : 'Live Image Preview'}
+                  </span>
+                  <div className="aspect-video rounded-xl overflow-hidden bg-black border border-zinc-200 flex items-center justify-center">
+                    {isAdminCreatingAd === 'VIDEO' || isVideoMedia(adminImageUrl) ? (
+                      <video 
+                        src={adminImageUrl} 
+                        controls 
+                        autoPlay 
+                        loop 
+                        muted 
+                        playsInline 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <img src={adminImageUrl} alt="Preview" className="w-full h-full object-cover" />
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Rendered Asset URL</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                  {isAdminCreatingAd === 'VIDEO' ? 'Video Media Asset URL (.mp4)' : 'Image Asset URL'}
+                </label>
                 <input
                   type="url"
                   required
@@ -1579,22 +2187,46 @@ export default function B2CDashboardLayout() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200 overflow-y-auto">
           <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl border border-zinc-200 space-y-6 my-8">
             <div className="flex justify-between items-start border-b border-zinc-100 pb-4">
-              <div>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-50 text-red-600 font-black text-[10px] uppercase tracking-wider mb-1">
-                  <Share2 className="w-3 h-3" />
-                  <span>Omnichannel Ad Dispatch</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (postStep === 2) setPostStep(1);
+                    else { setIsPostingModalOpen(false); setPublishResults(null); }
+                  }}
+                  className="p-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-black transition-colors flex items-center gap-1 text-xs font-bold mr-1"
+                  title={postStep === 2 ? "Back to Step 1" : "Close Modal"}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-50 text-red-600 font-black text-[10px] uppercase tracking-wider mb-1">
+                    <Share2 className="w-3 h-3" />
+                    <span>Omnichannel Ad Dispatch</span>
+                  </div>
+                  <h2 className="text-xl font-black text-black font-display">
+                    {postStep === 1 ? 'Configure Post & Channels (Step 1/2)' : 'Review & Live Preview (Step 2/2)'}
+                  </h2>
                 </div>
-                <h2 className="text-xl font-black text-black font-display">
-                  Post & Dispatch Ad Creative
-                </h2>
               </div>
-              <button 
-                onClick={() => { setIsPostingModalOpen(false); setPublishResults(null); }} 
-                className="p-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-black transition-colors"
-                disabled={isPublishing}
-              >
-                <X className="w-4 h-4" />
-              </button>
+
+              {/* Step Badges & Exit Button */}
+              <div className="flex items-center gap-2">
+                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${postStep === 1 ? 'bg-red-600 text-white' : 'bg-zinc-100 text-zinc-600'}`}>
+                  1. Details
+                </span>
+                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${postStep === 2 ? 'bg-red-600 text-white' : 'bg-zinc-100 text-zinc-600'}`}>
+                  2. Preview
+                </span>
+                <button 
+                  onClick={() => { setIsPostingModalOpen(false); setPublishResults(null); }} 
+                  className="p-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-black transition-colors ml-1"
+                  disabled={isPublishing}
+                  title="Close and return to dashboard"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {isPublishing ? (
@@ -1646,8 +2278,9 @@ export default function B2CDashboardLayout() {
                   </button>
                 </div>
               </div>
-            ) : (
-              <form onSubmit={handlePublishPost} className="space-y-4">
+            ) : postStep === 1 ? (
+              /* STEP 1: CONFIGURE DETAILS */
+              <div className="space-y-4">
                 {/* Media Asset Preview & Selector */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
@@ -1741,40 +2374,40 @@ export default function B2CDashboardLayout() {
                 </div>
 
                 {/* Caption */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                    4. Post Caption & Copy *
-                  </label>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600">
+                      4. Post Caption & Social Copy *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const expanded = `🔥 EXCLUSIVE LAUNCH: Elevate your lifestyle with ${postHeadline || productName || 'our latest drop'} by ${brandName || 'Official Brand'}!\n\n✨ Why Customers Love It:\n• 🚀 Precision Engineering & Durability\n• 🌿 Ultra-Comfortable Everyday Ergonomics\n• 🛡️ 100% Satisfaction Guarantee & Fast Delivery\n\n🎁 Limited Time Offer: Tap the link below to get 25% OFF your order today! #ad #${(brandName || 'Brand').toLowerCase().replace(/\s+/g, '')} #exclusive`;
+                        setPostCaption(expanded);
+                      }}
+                      className="btn-shimmer px-2.5 py-0.5 bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-black rounded-lg border border-red-200 transition-all flex items-center gap-1 shadow-sm"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>✨ Add More Words (Expand)</span>
+                    </button>
+                  </div>
                   <textarea
                     required
                     value={postCaption}
                     onChange={(e) => setPostCaption(e.target.value)}
-                    rows={3}
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-medium text-xs text-black focus:outline-none focus:border-red-600 resize-none leading-relaxed"
+                    rows={4}
+                    placeholder="Enter social caption or click '✨ Add More Words' to auto-generate full caption..."
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-medium text-xs text-black focus:outline-none focus:border-red-600 resize-y leading-relaxed"
                   />
-                </div>
-
-                {/* CTA Link */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                    5. Destination / Shop URL
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="url"
-                      value={postTargetUrl}
-                      onChange={(e) => setPostTargetUrl(e.target.value)}
-                      placeholder="https://yourbrand.com/product"
-                      className="w-full pl-9 pr-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
-                    />
-                    <Globe className="w-4 h-4 text-zinc-400 absolute left-3 top-3.5" />
+                  <div className="text-[10px] text-zinc-400 font-medium text-right">
+                    {postCaption.trim() ? postCaption.trim().split(/\s+/).filter(Boolean).length : 0} words
                   </div>
                 </div>
 
                 {/* Schedule Type */}
                 <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-2">
                   <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600">
-                    6. Dispatch Schedule
+                    5. Dispatch Schedule
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -1816,16 +2449,103 @@ export default function B2CDashboardLayout() {
                   )}
                 </div>
 
-                {/* Action Buttons */}
-                <div className="pt-2">
+                {/* Step 1 Action Buttons: Return/Cancel vs Next Page */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <button
-                    type="submit"
-                    className="btn-shimmer w-full py-4 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl uppercase text-xs tracking-wider shadow-md shadow-red-600/20"
+                    type="button"
+                    onClick={() => { setIsPostingModalOpen(false); setPublishResults(null); }}
+                    className="w-full sm:w-1/2 py-3.5 bg-zinc-100 hover:bg-zinc-200 text-black font-bold rounded-xl uppercase text-xs tracking-wider border border-zinc-300 transition-colors"
                   >
-                    {postScheduleType === 'NOW' ? 'Publish Post Across Channels' : 'Confirm & Schedule Post'}
+                    ← Cancel / Return to Dashboard
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!postHeadline.trim() || !postCaption.trim()) {
+                        alert("Please fill in Post Headline and Caption before proceeding.");
+                        return;
+                      }
+                      if (postChannels.length === 0) {
+                        alert("Please select at least one social media channel.");
+                        return;
+                      }
+                      setPostStep(2);
+                    }}
+                    className="btn-shimmer w-full sm:w-1/2 py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl uppercase text-xs tracking-wider shadow-md shadow-red-600/20 flex items-center justify-center gap-1.5"
+                  >
+                    <span>Next: Live Feed Preview</span>
+                    <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
-              </form>
+              </div>
+            ) : (
+              /* STEP 2: REVIEW & LIVE PREVIEW */
+              <div className="space-y-5">
+                <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black uppercase text-zinc-500">Live Post Simulation</span>
+                    <span className="px-2.5 py-0.5 bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold rounded-full">Ready to Dispatch</span>
+                  </div>
+
+                  {/* Simulated Social Post Card */}
+                  <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm space-y-3 p-3.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-red-600 text-white font-black flex items-center justify-center text-xs">
+                        {(brandName || 'AD').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-black">{brandName || 'Brand Sponsor'}</div>
+                        <div className="text-[9px] text-zinc-400 font-semibold">Sponsored • {postChannels.join(', ')}</div>
+                      </div>
+                    </div>
+
+                    <div className="relative rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center">
+                      <img src={postMediaUrl} alt="Preview" className="w-full h-full object-cover" />
+                      <div className="absolute bottom-2 right-2 px-3 py-1 bg-red-600 text-white rounded-lg text-[10px] font-black uppercase shadow-md">
+                        I'm Interested
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="text-xs font-black text-black">{postHeadline}</div>
+                      <p className="text-xs text-zinc-600 whitespace-pre-line leading-relaxed">{postCaption}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-zinc-600 pt-1">
+                    <span>Dispatch Mode: <strong>{postScheduleType === 'NOW' ? '🚀 Instant Publishing' : `📅 Scheduled (${postScheduledDate})`}</strong></span>
+                    <span>Channels: <strong>{postChannels.length} Selected</strong></span>
+                  </div>
+                </div>
+
+                {/* Step 2 Action Buttons: Back, Cancel & Publish */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setPostStep(1)}
+                    className="w-full sm:w-1/3 py-3.5 bg-zinc-100 hover:bg-zinc-200 text-black font-bold rounded-xl uppercase text-xs tracking-wider border border-zinc-300 transition-colors"
+                  >
+                    ← Back to Edit
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setIsPostingModalOpen(false); setPublishResults(null); }}
+                    className="w-full sm:w-1/3 py-3.5 bg-white hover:bg-zinc-50 text-zinc-600 font-bold rounded-xl uppercase text-xs tracking-wider border border-zinc-200 transition-colors"
+                  >
+                    Cancel & Exit
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handlePublishPost}
+                    disabled={isPublishing}
+                    className="btn-shimmer w-full sm:w-1/3 py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl uppercase text-xs tracking-wider shadow-md shadow-red-600/20"
+                  >
+                    {postScheduleType === 'NOW' ? '🚀 Publish Live' : 'Confirm Schedule'}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -1866,9 +2586,12 @@ export default function B2CDashboardLayout() {
               {/* Fake Action Bar */}
               <div className="p-3 bg-zinc-50 border-t border-zinc-100 flex justify-between items-center">
                 <div className="text-xs font-black text-black truncate max-w-[180px]">{previewingPost.headline}</div>
-                <span className="px-3 py-1 bg-red-600 text-white text-[10px] font-black rounded-lg uppercase">
-                  Shop Now
-                </span>
+                <button
+                  onClick={() => setInterestedModalAd(previewingPost)}
+                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black rounded-lg uppercase tracking-wider shadow-sm transition-all"
+                >
+                  I'm Interested
+                </button>
               </div>
 
               {/* Caption */}
@@ -1877,6 +2600,168 @@ export default function B2CDashboardLayout() {
                 {previewingPost.caption}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* LEAD CAPTURE MODAL: "I'm Interested" */}
+      {interestedModalAd && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-zinc-200 space-y-5 animate-in zoom-in-95 duration-200">
+            
+            <div className="flex justify-between items-start border-b border-zinc-100 pb-3">
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full bg-red-50 text-red-600 text-[10px] font-black uppercase tracking-wider">
+                  Prospect Inbound Capture
+                </span>
+                <h3 className="text-xl font-black text-black font-display mt-1">I'm Interested!</h3>
+                <p className="text-xs text-zinc-500 font-medium">Leave your contact info to get exclusive details & pricing.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button" 
+                  onClick={() => setInterestedModalAd(null)}
+                  className="px-3 py-1 bg-zinc-100 hover:bg-zinc-200 text-black font-bold text-xs rounded-xl flex items-center gap-1 border border-zinc-200"
+                >
+                  <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                  <span>Go Back</span>
+                </button>
+                <button 
+                  onClick={() => setInterestedModalAd(null)}
+                  className="p-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-black"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleCaptureLeadSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">Your Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={leadName}
+                  onChange={(e) => setLeadName(e.target.value)}
+                  placeholder="e.g. Alex Morgan"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">Phone Number *</label>
+                <input
+                  type="text"
+                  required
+                  value={leadPhone}
+                  onChange={(e) => setLeadPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">Email Address *</label>
+                <input
+                  type="email"
+                  required
+                  value={leadEmail}
+                  onChange={(e) => setLeadEmail(e.target.value)}
+                  placeholder="alex@example.com"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                />
+              </div>
+
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setInterestedModalAd(null)}
+                  className="w-1/2 py-3.5 bg-zinc-100 hover:bg-zinc-200 text-black font-bold rounded-xl uppercase text-xs border border-zinc-300 transition-colors"
+                >
+                  ← Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-shimmer w-1/2 py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl uppercase text-xs tracking-wider shadow-md shadow-red-600/20"
+                >
+                  Submit & Connect
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* FULLSCREEN MULTI-PLATFORM LIVE AD INSPECTION MODAL */}
+      {fullPreviewVideoAd && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-zinc-200 flex flex-col max-h-[92vh]">
+            
+            {/* Modal Header */}
+            <div className="p-4 bg-zinc-900 text-white flex justify-between items-center border-b border-zinc-800 shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setFullPreviewVideoAd(null)}
+                  className="px-2.5 py-1 rounded-xl bg-zinc-800 text-white font-bold text-xs hover:bg-zinc-700 transition-colors flex items-center gap-1 mr-1"
+                  title="Go Back"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back</span>
+                </button>
+                <div className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
+                <span className="text-xs font-black uppercase tracking-wider">Multi-App Live Ad Simulator</span>
+              </div>
+              <button
+                onClick={() => setFullPreviewVideoAd(null)}
+                className="p-1.5 rounded-xl bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Scrollable Multi-App Simulator Area */}
+            <div className="overflow-y-auto p-4 sm:p-6 space-y-4 bg-zinc-50 flex-1">
+              <AppPlatformAdMockup
+                mediaUrl={fullPreviewVideoAd.mediaUrl}
+                isVideo={fullPreviewVideoAd.adType === 'Video' || isVideoMedia(fullPreviewVideoAd.mediaUrl)}
+                brandName={fullPreviewVideoAd.brandName || brandName || 'Brand Partner'}
+                headline={fullPreviewVideoAd.headline}
+                description={fullPreviewVideoAd.description}
+                productName={fullPreviewVideoAd.productName}
+                initialFormat={fullPreviewVideoAd.format || 'INSTAGRAM_POST'}
+                allowFormatSwitching={true}
+                onInterestClick={() => {
+                  setInterestedModalAd({
+                    id: `AD-${Date.now().toString().slice(-4)}`,
+                    productName: fullPreviewVideoAd.productName || fullPreviewVideoAd.headline,
+                    headline: fullPreviewVideoAd.headline,
+                    description: fullPreviewVideoAd.description,
+                    adType: 'Video',
+                    purpose: 'Lead Gen',
+                    cta: "I'm Interested",
+                    maxWords: 60,
+                    style: 'Modern',
+                    format: fullPreviewVideoAd.format || 'Instagram Reel',
+                    status: 'APPROVED',
+                    createdDate: new Date().toISOString().split('T')[0]
+                  });
+                  setFullPreviewVideoAd(null);
+                }}
+              />
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-white border-t border-zinc-200 flex justify-between items-center shrink-0">
+              <span className="text-[10px] font-mono font-bold text-zinc-400">STATUS: APPROVED & OMNICHANNEL READY</span>
+              <button
+                onClick={() => setFullPreviewVideoAd(null)}
+                className="px-5 py-2.5 bg-zinc-100 text-black hover:bg-zinc-200 border border-zinc-300 font-bold text-xs uppercase rounded-xl transition-colors flex items-center gap-1.5"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>← Close & Return</span>
+              </button>
+            </div>
+
           </div>
         </div>
       )}

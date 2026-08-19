@@ -11,10 +11,21 @@ const app = express();
 const port = process.env.PORT || 3000;
 const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/adhunter_db';
 
-app.use(helmet());
-app.use(cors());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginEmbedderPolicy: false
+}));
+app.use(cors({
+  origin: '*',
+  credentials: true
+}));
 app.use(express.json({ limit: '50mb' }));
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
+  setHeaders: (res) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+}));
 
 import authRoutes from './modules/auth/auth.routes';
 import campaignRoutes from './modules/campaigns/campaign.routes';
@@ -23,6 +34,7 @@ import userRoutes from './modules/users/user.routes';
 import freeAdRoutes from './modules/creatives/freeAd.routes';
 import b2cRequestRoutes from './modules/creatives/b2cRequest.routes';
 import socialRoutes from './modules/social/social.routes';
+import uploadRoutes from './modules/upload/upload.routes';
 
 // Basic health check route
 app.get('/health', (req, res) => {
@@ -37,6 +49,7 @@ app.use('/api/b2c-requests', b2cRequestRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/social', socialRoutes);
+app.use('/api/upload', uploadRoutes);
 
 
 

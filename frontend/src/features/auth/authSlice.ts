@@ -17,12 +17,58 @@ interface AuthState {
   isAuthenticated: boolean;
 }
 
-// Load initial state from localStorage if available
-const storedUser = localStorage.getItem('auth_user');
+// Load initial state from localStorage if available with full customerType and subscription sync
+const getInitialUser = (): any => {
+  const storedUser = localStorage.getItem('auth_user');
+  if (!storedUser) return null;
+  try {
+    const parsed = JSON.parse(storedUser);
+    const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
+    const local = mockUsers.find((u: any) => u.email?.toLowerCase() === parsed.email?.toLowerCase());
+
+    // Check all_b2c_requests for active B2C client requests
+    let hasB2C = false;
+    try {
+      const allReqs = JSON.parse(localStorage.getItem('all_b2c_requests') || '[]');
+      hasB2C = allReqs.some((r: any) => 
+        (r.userEmail && r.userEmail.toLowerCase() === parsed.email?.toLowerCase()) || 
+        r.userId === parsed.id || r.userId === parsed._id || (local && r.userId === local._id)
+      );
+    } catch (e) {}
+
+    let cType = local?.customerType || parsed.customerType || (hasB2C ? 'B2C' : 'EXPLORER');
+    let sub = local?.subscription || parsed.subscription;
+    if (sub) {
+      const subLower = sub.toLowerCase();
+      if (subLower.includes('starter') || subLower.includes('growth') || subLower.includes('scale') || subLower.includes('b2b')) {
+        cType = 'B2B';
+      } else {
+        cType = 'B2C';
+      }
+    } else if (hasB2C && cType === 'EXPLORER') {
+      cType = 'B2C';
+    }
+
+    return {
+      ...parsed,
+      ...(local || {}),
+      customerType: cType,
+      accountType: cType,
+      role: cType === 'B2B' ? 'BUSINESS_OWNER' : (parsed.role === 'SUPER_ADMIN' || local?.role === 'SUPER_ADMIN') ? 'SUPER_ADMIN' : 'CUSTOMER',
+      subscription: sub,
+      paymentStatus: (local?.paymentStatus || parsed.paymentStatus) || (sub ? 'PAID' : 'PENDING'),
+      freeAdGenerated: true,
+      freeAdsUsed: 1
+    };
+  } catch (e) {
+    return null;
+  }
+};
+
 const storedToken = localStorage.getItem('auth_token');
 
 const initialState: AuthState = {
-  user: storedUser ? JSON.parse(storedUser) : null,
+  user: getInitialUser(),
   token: storedToken || null,
   isAuthenticated: !!storedToken,
 };

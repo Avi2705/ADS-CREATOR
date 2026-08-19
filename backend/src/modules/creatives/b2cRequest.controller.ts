@@ -58,6 +58,26 @@ export const createB2CRequest = async (req: Request, res: Response): Promise<voi
       return;
     }
 
+    // Check existing ads for this specific product under user's subscription
+    const existingCount = await B2CRequest.countDocuments({
+      customerId: user._id,
+      productName
+    });
+
+    const userSub = (user as any).subscription || 'B2C Basic Plan';
+    const maxAllowed = userSub.includes('Enterprise') || userSub.includes('Scale') ? 10 : userSub.includes('Pro') || userSub.includes('Growth') ? 3 : 2;
+
+    if (existingCount >= maxAllowed) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: 'SUBSCRIPTION_LIMIT_MET',
+          message: `You have already met your subscription limit for product "${productName}" (${existingCount}/${maxAllowed} ads created under ${userSub}). If you want to create more ads, please upgrade to our higher plans.`
+        }
+      });
+      return;
+    }
+
     const referenceId = `REQ-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
 
     const newRequest = await B2CRequest.create({

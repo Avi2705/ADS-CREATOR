@@ -1,7 +1,25 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
+import { ArrowLeft } from 'lucide-react';
 import { setCredentials } from '../../features/auth/authSlice';
+
+export const COUNTRY_CODES = [
+  { code: '+91', country: 'India', flag: '🇮🇳', length: 10, placeholder: '10-digit mobile number' },
+  { code: '+1', country: 'USA / Canada', flag: '🇺🇸', length: 10, placeholder: '10-digit phone number' },
+  { code: '+44', country: 'United Kingdom', flag: '🇬🇧', minLength: 10, maxLength: 11, length: 10, placeholder: '10 or 11-digit phone' },
+  { code: '+971', country: 'UAE', flag: '🇦🇪', length: 9, placeholder: '9-digit phone number' },
+  { code: '+65', country: 'Singapore', flag: '🇸🇬', length: 8, placeholder: '8-digit phone number' },
+  { code: '+61', country: 'Australia', flag: '🇦🇺', length: 9, placeholder: '9-digit phone number' },
+  { code: '+49', country: 'Germany', flag: '🇩🇪', minLength: 10, maxLength: 11, length: 11, placeholder: '10 or 11-digit phone' },
+  { code: '+33', country: 'France', flag: '🇫🇷', length: 9, placeholder: '9-digit phone number' },
+  { code: '+81', country: 'Japan', flag: '🇯🇵', length: 10, placeholder: '10-digit phone number' },
+  { code: '+966', country: 'Saudi Arabia', flag: '🇸🇦', length: 9, placeholder: '9-digit phone number' },
+];
+
+export const getCountryRule = (code: string) => {
+  return COUNTRY_CODES.find(c => c.code === code) || { code, country: 'International', flag: '🌐', length: 10, placeholder: 'Phone number' };
+};
 
 export default function Join() {
   const [step, setStep] = useState(1);
@@ -18,6 +36,7 @@ export default function Join() {
   // Form State - Step 2: Company / Business Info
   const [companyName, setCompanyName] = useState('');
   const [companyEmail, setCompanyEmail] = useState('');
+  const [companyCountryCode, setCompanyCountryCode] = useState('+91');
   const [companyPhone, setCompanyPhone] = useState('');
   const [website, setWebsite] = useState('');
   const companyCountry = 'India';
@@ -54,6 +73,28 @@ export default function Join() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
+  const validatePhoneNumber = (rawPhone: string, code: string, fieldName: string): boolean => {
+    if (!rawPhone.trim()) return true;
+    const digitsOnly = rawPhone.replace(/\D/g, '');
+    if (rawPhone !== digitsOnly) {
+      alert(`${fieldName} must contain only numbers (no letters or symbols).`);
+      return false;
+    }
+    const rule = getCountryRule(code);
+    if (rule.minLength && rule.maxLength) {
+      if (digitsOnly.length < rule.minLength || digitsOnly.length > rule.maxLength) {
+        alert(`For ${rule.country} (${rule.code}), ${fieldName.toLowerCase()} must be between ${rule.minLength} and ${rule.maxLength} digits. You entered ${digitsOnly.length} digits.`);
+        return false;
+      }
+    } else if (rule.length) {
+      if (digitsOnly.length !== rule.length) {
+        alert(`For ${rule.country} (${rule.code}), ${fieldName.toLowerCase()} must be exactly ${rule.length} digits. You entered ${digitsOnly.length} digits.`);
+        return false;
+      }
+    }
+    return true;
+  };
+
   const validateStep1 = () => {
     if (!name || !email || !password || !confirmPassword || !phone) {
       alert("Please fill in all required (*) personal details.");
@@ -69,31 +110,8 @@ export default function Join() {
       alert("Password must be at least 8 characters long and contain at least one uppercase letter, one number, and one special character.");
       return false;
     }
-    // Phone Number digits-only check
-    const digitsOnly = phone.replace(/\D/g, '');
-    if (phone !== digitsOnly) {
-      alert("Phone number must contain only numbers.");
-      return false;
-    }
-
-    // Country Code specific length checks
-    if (countryCode === '+91') {
-      if (digitsOnly.length !== 10) {
-        alert("For India (+91), the mobile number must be exactly 10 digits.");
-        return false;
-      }
-    } else if (countryCode === '+1') {
-      if (digitsOnly.length !== 10) {
-        alert("For America (+1), the phone number must be exactly 10 digits.");
-        return false;
-      }
-    } else if (countryCode === '+44') {
-      if (digitsOnly.length !== 10 && digitsOnly.length !== 11) {
-        alert("For United Kingdom (+44), the phone number must be 10 or 11 digits.");
-        return false;
-      }
-    }
-    return true;
+    // Validate phone number against country rule
+    return validatePhoneNumber(phone, countryCode, "Contact phone number");
   };
 
   const handleNextStep = (e: React.FormEvent) => {
@@ -103,6 +121,9 @@ export default function Join() {
     } else if (step === 2) {
       if (!companyName || !businessType || !industry || !productCategories || !description) {
         alert("Please fill in all required (*) business details.");
+        return;
+      }
+      if (companyPhone && !validatePhoneNumber(companyPhone, companyCountryCode, "Company phone number")) {
         return;
       }
       registerUser('COMPLETED');
@@ -116,13 +137,13 @@ export default function Join() {
       password,
       country,
       countryCode,
-      phone,
+      phone: `${countryCode} ${phone}`,
       profileStatus,
       intentType,
       // Company info
       companyName,
       companyEmail,
-      companyPhone,
+      companyPhone: companyPhone ? `${companyCountryCode} ${companyPhone}` : '',
       website,
       companyCountry,
       state,
@@ -162,7 +183,6 @@ export default function Join() {
     const mockUser = {
       _id: `lead-${Date.now()}`,
       referenceId: leadRefId,
-
       email,
       password,
       name,
@@ -173,6 +193,10 @@ export default function Join() {
       role: 'CUSTOMER',
       status: 'LEAD',
       paymentStatus: 'PENDING',
+      freeAdsAllowed: 1,
+      freeAdsUsed: 0,
+      freeAdsRemaining: 1,
+      freeAdGenerated: false,
       mobile: `${countryCode} ${phone}`,
       countryCode,
       phone,
@@ -221,6 +245,8 @@ export default function Join() {
         customerType: 'EXPLORER',
         intentType: mockUser.intentType,
         status: 'NEW',
+        freeAdsAllowed: 1,
+        freeAdsUsed: 0,
         profileStatus,
         createdAt: new Date().toISOString()
       });
@@ -236,13 +262,13 @@ export default function Join() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Registration failed');
       
-      dispatch(setCredentials({ user: { ...mockUser, ...data.user }, token: data.token }));
-      navigate('/explorer');
+      dispatch(setCredentials({ user: { ...mockUser, ...data.user, freeAdsAllowed: 1, freeAdsUsed: 0 }, token: data.token }));
+      navigate('/explorer/free-ad');
       
     } catch (err: any) {
       console.warn("Backend offline or local fallback:", err.message);
       dispatch(setCredentials({ user: mockUser, token: 'mock-jwt-token' }));
-      navigate('/explorer');
+      navigate('/explorer/free-ad');
     }
   };
 
@@ -257,9 +283,31 @@ export default function Join() {
 
   return (
     <div className="min-h-screen bg-white text-black flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
-      <div className="max-w-2xl w-full bg-white rounded-3xl border border-zinc-200 p-8 sm:p-10 shadow-lg">
+      <div className="max-w-2xl w-full bg-white rounded-3xl border border-zinc-200 p-8 sm:p-10 shadow-lg space-y-6">
         
-        <div className="text-center mb-8">
+        {/* Top-Left Back Navigation */}
+        <div className="flex justify-between items-center -mt-2">
+          {step === 1 ? (
+            <Link 
+              to="/" 
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-black transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-50 hover:bg-zinc-100 border border-zinc-200"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-zinc-500" />
+              <span>Back to Home</span>
+            </Link>
+          ) : (
+            <button 
+              type="button"
+              onClick={() => setStep(1)}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-black transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-50 hover:bg-zinc-100 border border-zinc-200"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-zinc-500" />
+              <span>Back to Step 1 (Personal Info)</span>
+            </button>
+          )}
+        </div>
+
+        <div className="text-center mb-6">
           <Link to="/" className="text-3xl font-black tracking-tight font-display text-black">
             AD<span className="text-red-600">HUNTER</span>
           </Link>
@@ -304,17 +352,25 @@ export default function Join() {
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Contact Phone *</label>
               <div className="flex gap-2">
-                <select value={countryCode} onChange={e => setCountryCode(e.target.value)} className="p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 w-24 text-sm">
-                  <option value="+91">🇮🇳 +91</option>
-                  <option value="+1">🇺🇸 +1</option>
-                  <option value="+44">🇬🇧 +44</option>
+                <select 
+                  value={countryCode} 
+                  onChange={e => setCountryCode(e.target.value)} 
+                  className="p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 w-32 text-xs"
+                >
+                  {COUNTRY_CODES.map(c => (
+                    <option key={c.code} value={c.code}>
+                      {c.flag} {c.code}
+                    </option>
+                  ))}
                 </select>
                 <input 
-                  type="text" required value={phone} 
-                  onChange={e => setPhone(e.target.value)} 
-                  maxLength={countryCode === '+91' || countryCode === '+1' ? 10 : countryCode === '+44' ? 11 : undefined}
+                  type="tel" 
+                  required 
+                  value={phone} 
+                  onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} 
+                  maxLength={getCountryRule(countryCode).maxLength || getCountryRule(countryCode).length}
                   className="flex-1 p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm" 
-                  placeholder={countryCode === '+91' ? '10-digit number' : 'Phone'} 
+                  placeholder={getCountryRule(countryCode).placeholder} 
                 />
               </div>
             </div>
@@ -347,14 +403,34 @@ export default function Join() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Company Email</label>
                 <input type="email" value={companyEmail} onChange={e => setCompanyEmail(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm" placeholder="corp@acme.com" />
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Company Phone</label>
-                <input type="text" value={companyPhone} onChange={e => setCompanyPhone(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm" placeholder="+1 555-0011" />
+                <div className="flex gap-2">
+                  <select 
+                    value={companyCountryCode} 
+                    onChange={e => setCompanyCountryCode(e.target.value)} 
+                    className="p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 w-32 text-xs"
+                  >
+                    {COUNTRY_CODES.map(c => (
+                      <option key={c.code} value={c.code}>
+                        {c.flag} {c.code}
+                      </option>
+                    ))}
+                  </select>
+                  <input 
+                    type="tel" 
+                    value={companyPhone} 
+                    onChange={e => setCompanyPhone(e.target.value.replace(/\D/g, ''))} 
+                    maxLength={getCountryRule(companyCountryCode).maxLength || getCountryRule(companyCountryCode).length}
+                    className="flex-1 p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm" 
+                    placeholder={getCountryRule(companyCountryCode).placeholder} 
+                  />
+                </div>
               </div>
             </div>
 

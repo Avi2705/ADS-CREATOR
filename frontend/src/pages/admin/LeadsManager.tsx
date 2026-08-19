@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
-  Users, Search, 
-  ArrowRight, Filter, UserPlus
+  Users, ArrowRight, Search, Filter, UserPlus, ArrowLeft 
 } from 'lucide-react';
+import { getPlanConfig } from '../../constants/subscriptionPlans';
 
 interface Lead {
   id: string;
@@ -32,9 +33,113 @@ export default function LeadsManager() {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
 
+  // Manual Creation States
+  const [isCreateLeadModalOpen, setIsCreateLeadModalOpen] = useState(false);
+  const [isCreateCustModalOpen, setIsCreateCustModalOpen] = useState(false);
+
+  const [newLeadName, setNewLeadName] = useState('');
+  const [newLeadEmail, setNewLeadEmail] = useState('');
+  const [newLeadPhone, setNewLeadPhone] = useState('');
+  const [newLeadCompany, setNewLeadCompany] = useState('');
+  const [newLeadIntent, setNewLeadIntent] = useState<'B2C' | 'B2B' | 'Explorer'>('B2C');
+
+  const [newCustName, setNewCustName] = useState('');
+  const [newCustEmail, setNewCustEmail] = useState('');
+  const [newCustPhone, setNewCustPhone] = useState('');
+  const [newCustCompany, setNewCustCompany] = useState('');
+  const [newCustPlan, setNewCustPlan] = useState('B2C Basic Plan');
+
   // Assignment / Conversion states
   const [selectedEmployeeRef, setSelectedEmployeeRef] = useState('');
-  const [conversionPlan, setConversionPlan] = useState('B2C Growth');
+  const [conversionPlan, setConversionPlan] = useState('B2C Basic Plan');
+
+  const handleCreateManualLead = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLeadName || !newLeadEmail || !newLeadPhone) {
+      alert("Please fill in Name, Email, and Phone.");
+      return;
+    }
+    const leadRefId = `LEAD-REF-${Math.floor(100000 + Math.random() * 900000)}`;
+    const newLeadObj = {
+      _id: `lead-${Date.now()}`,
+      referenceId: leadRefId,
+      name: newLeadName,
+      firstName: newLeadName.split(' ')[0],
+      lastName: newLeadName.split(' ')[1] || '',
+      email: newLeadEmail,
+      mobile: newLeadPhone,
+      companyName: newLeadCompany || 'Manual Lead Brand',
+      customerType: newLeadIntent === 'B2B' ? 'B2B' : 'EXPLORER',
+      intentType: newLeadIntent,
+      accountType: 'EXPLORER',
+      role: 'CUSTOMER',
+      status: 'LEAD',
+      paymentStatus: 'PENDING',
+      createdDate: new Date().toISOString().split('T')[0]
+    };
+
+    const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
+    mockUsers.unshift(newLeadObj);
+    localStorage.setItem('mock_users', JSON.stringify(mockUsers));
+
+    setLeads(prev => [{
+      id: newLeadObj._id,
+      referenceId: leadRefId,
+      name: newLeadName,
+      email: newLeadEmail,
+      phone: newLeadPhone,
+      companyName: newLeadCompany || 'Manual Lead Brand',
+      intentType: newLeadIntent,
+      profileStatus: 'COMPLETED',
+      status: 'NEW',
+      paymentStatus: 'PENDING',
+      source: 'Admin Manual Entry',
+      createdDate: newLeadObj.createdDate
+    }, ...prev]);
+
+    setNewLeadName(''); setNewLeadEmail(''); setNewLeadPhone(''); setNewLeadCompany('');
+    setIsCreateLeadModalOpen(false);
+    alert(`Manual Lead created!\nReference ID: ${leadRefId}`);
+  };
+
+  const handleCreateManualCustomer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustName || !newCustEmail || !newCustPhone) {
+      alert("Please fill in Name, Email, and Phone.");
+      return;
+    }
+    const planDef = getPlanConfig(newCustPlan);
+    const custRefId = `CUST-REF-${Math.floor(100000 + Math.random() * 900000)}`;
+    const newCustObj = {
+      _id: `cust-${Date.now()}`,
+      referenceId: custRefId,
+      name: newCustName,
+      firstName: newCustName.split(' ')[0],
+      lastName: newCustName.split(' ')[1] || '',
+      email: newCustEmail,
+      mobile: newCustPhone,
+      companyName: newCustCompany || 'Subscribed Brand',
+      customerType: 'B2C',
+      accountType: 'B2C',
+      role: 'CUSTOMER',
+      status: 'ACTIVE',
+      paymentStatus: 'PAID',
+      subscription: planDef.name,
+      maxProducts: planDef.maxProducts,
+      imageAdsPerProduct: planDef.imageAdsPerProduct,
+      videoAdsPerProduct: planDef.videoAdsPerProduct,
+      allowVideos: planDef.allowVideos,
+      createdDate: new Date().toISOString().split('T')[0]
+    };
+
+    const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
+    mockUsers.unshift(newCustObj);
+    localStorage.setItem('mock_users', JSON.stringify(mockUsers));
+
+    setNewCustName(''); setNewCustEmail(''); setNewCustPhone(''); setNewCustCompany('');
+    setIsCreateCustModalOpen(false);
+    alert(`Manual Active B2C Customer created!\nCustomer Ref ID: ${custRefId}\nPlan: ${newCustPlan}`);
+  };
 
 
   useEffect(() => {
@@ -102,6 +207,7 @@ export default function LeadsManager() {
     e.preventDefault();
     if (!selectedLead) return;
 
+    const planDef = getPlanConfig(conversionPlan);
     const customerRefId = `CUST-REF-${Math.floor(100000 + Math.random() * 900000)}`;
 
     // Convert in local state
@@ -118,7 +224,11 @@ export default function LeadsManager() {
         accountType: 'B2C',
         role: 'CUSTOMER',
         paymentStatus: 'PAID',
-        subscription: conversionPlan,
+        subscription: planDef.name,
+        maxProducts: planDef.maxProducts,
+        imageAdsPerProduct: planDef.imageAdsPerProduct,
+        videoAdsPerProduct: planDef.videoAdsPerProduct,
+        allowVideos: planDef.allowVideos,
         referenceId: customerRefId
       };
       localStorage.setItem('mock_users', JSON.stringify(mockUsers));
@@ -133,7 +243,11 @@ export default function LeadsManager() {
         accountType: 'B2C',
         role: 'CUSTOMER',
         paymentStatus: 'PAID',
-        subscription: conversionPlan,
+        subscription: planDef.name,
+        maxProducts: planDef.maxProducts,
+        imageAdsPerProduct: planDef.imageAdsPerProduct,
+        videoAdsPerProduct: planDef.videoAdsPerProduct,
+        allowVideos: planDef.allowVideos,
         mobile: selectedLead.phone,
         assignedEmployeeRefId: selectedEmployeeRef
       });
@@ -154,8 +268,19 @@ export default function LeadsManager() {
   });
 
   return (
-    <div className="space-y-8 bg-white text-black min-h-screen">
+    <div className="space-y-6 bg-white text-black min-h-screen">
       
+      {/* Top-Left Back Navigation */}
+      <div className="flex justify-between items-center">
+        <Link
+          to="/admin"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-black transition-colors px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 shadow-sm"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 text-zinc-500" />
+          <span>Back to Admin Dashboard</span>
+        </Link>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-200 pb-6">
         <div>
@@ -167,6 +292,24 @@ export default function LeadsManager() {
           <p className="text-xs text-zinc-600 font-medium mt-1">
             Track all incoming public signups (Leads). Convert leads into paying B2C customers upon subscription activation.
           </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsCreateLeadModalOpen(true)}
+            className="px-4 py-3 bg-zinc-100 hover:bg-zinc-200 text-black font-bold text-xs uppercase tracking-wider rounded-xl border border-zinc-200 flex items-center gap-1.5"
+          >
+            <UserPlus className="w-4 h-4 text-red-600" />
+            <span>Create Lead Manually</span>
+          </button>
+
+          <button
+            onClick={() => setIsCreateCustModalOpen(true)}
+            className="btn-shimmer px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center gap-1.5 shadow-md shadow-red-600/20"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Create Customer Manually</span>
+          </button>
         </div>
       </div>
 
@@ -422,6 +565,125 @@ export default function LeadsManager() {
                   className="btn-shimmer px-8 py-3.5 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-xl uppercase text-xs shadow-md shadow-red-600/20"
                 >
                   Activate Customer Account
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modal 3: Create Lead Manually */}
+      {isCreateLeadModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-zinc-200 space-y-4">
+            <div className="flex justify-between items-center border-b border-zinc-100 pb-3">
+              <h2 className="text-xl font-black text-black font-display">Create Lead Manually</h2>
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button" 
+                  onClick={() => setIsCreateLeadModalOpen(false)}
+                  className="px-3 py-1 bg-zinc-100 hover:bg-zinc-200 text-black font-bold text-xs rounded-xl flex items-center gap-1 border border-zinc-200"
+                >
+                  <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                  <span>Go Back</span>
+                </button>
+                <button onClick={() => setIsCreateLeadModalOpen(false)} className="text-zinc-400 hover:text-black">✕</button>
+              </div>
+            </div>
+            <form onSubmit={handleCreateManualLead} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-600 mb-1">Full Name *</label>
+                <input type="text" required value={newLeadName} onChange={e => setNewLeadName(e.target.value)} placeholder="e.g. Jordan Smith" className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-600 mb-1">Email Address *</label>
+                <input type="email" required value={newLeadEmail} onChange={e => setNewLeadEmail(e.target.value)} placeholder="jordan@brand.com" className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-600 mb-1">Phone Number *</label>
+                <input type="text" required value={newLeadPhone} onChange={e => setNewLeadPhone(e.target.value)} placeholder="+91 98765 43210" className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-600 mb-1">Company / Brand Name</label>
+                <input type="text" value={newLeadCompany} onChange={e => setNewLeadCompany(e.target.value)} placeholder="e.g. Apex Apparel" className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-600 mb-1">Intent Category</label>
+                <select value={newLeadIntent} onChange={e => setNewLeadIntent(e.target.value as any)} className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs">
+                  <option value="B2C">B2C Creative Studio</option>
+                  <option value="B2B">B2B SaaS Multi-Product</option>
+                  <option value="Explorer">Explorer Mode</option>
+                </select>
+              </div>
+              <div className="flex gap-2.5 pt-2">
+                <button 
+                  type="button" 
+                  onClick={() => setIsCreateLeadModalOpen(false)}
+                  className="w-1/2 py-3 bg-zinc-100 hover:bg-zinc-200 text-black font-bold rounded-xl text-xs uppercase border border-zinc-300"
+                >
+                  ← Cancel
+                </button>
+                <button type="submit" className="btn-shimmer w-1/2 py-3 bg-red-600 text-white font-black rounded-xl uppercase text-xs tracking-wider shadow-md">
+                  Create Lead
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 4: Create Customer Manually */}
+      {isCreateCustModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-zinc-200 space-y-4">
+            <div className="flex justify-between items-center border-b border-zinc-100 pb-3">
+              <h2 className="text-xl font-black text-black font-display">Create Subscribed Customer Manually</h2>
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button" 
+                  onClick={() => setIsCreateCustModalOpen(false)}
+                  className="px-3 py-1 bg-zinc-100 hover:bg-zinc-200 text-black font-bold text-xs rounded-xl flex items-center gap-1 border border-zinc-200"
+                >
+                  <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                  <span>Go Back</span>
+                </button>
+                <button onClick={() => setIsCreateCustModalOpen(false)} className="text-zinc-400 hover:text-black">✕</button>
+              </div>
+            </div>
+            <form onSubmit={handleCreateManualCustomer} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-600 mb-1">Customer Full Name *</label>
+                <input type="text" required value={newCustName} onChange={e => setNewCustName(e.target.value)} placeholder="e.g. Sarah Connor" className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-600 mb-1">Email Address *</label>
+                <input type="email" required value={newCustEmail} onChange={e => setNewCustEmail(e.target.value)} placeholder="sarah@cyber.com" className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-600 mb-1">Phone Number *</label>
+                <input type="text" required value={newCustPhone} onChange={e => setNewCustPhone(e.target.value)} placeholder="+91 98765 43210" className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-600 mb-1">Company / Brand Name</label>
+                <input type="text" value={newCustCompany} onChange={e => setNewCustCompany(e.target.value)} placeholder="e.g. Cyber Systems" className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-600 mb-1">Subscription Plan</label>
+                <select value={newCustPlan} onChange={e => setNewCustPlan(e.target.value)} className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs">
+                  <option value="B2C Basic Plan">B2C Basic Plan (₹1,499/mo)</option>
+                  <option value="B2C Pro Plan">B2C Pro Plan (₹3,499/mo)</option>
+                  <option value="B2C Enterprise Plan">B2C Enterprise Plan (₹7,999/mo)</option>
+                </select>
+              </div>
+              <div className="flex gap-2.5 pt-2">
+                <button 
+                  type="button" 
+                  onClick={() => setIsCreateCustModalOpen(false)}
+                  className="w-1/2 py-3 bg-zinc-100 hover:bg-zinc-200 text-black font-bold rounded-xl text-xs uppercase border border-zinc-300"
+                >
+                  ← Cancel
+                </button>
+                <button type="submit" className="btn-shimmer w-1/2 py-3.5 bg-red-600 text-white font-black rounded-xl uppercase text-xs tracking-wider shadow-md">
+                  Provision Customer
                 </button>
               </div>
             </form>

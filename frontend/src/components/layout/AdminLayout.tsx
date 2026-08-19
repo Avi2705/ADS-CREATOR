@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { logOut } from '../../features/auth/authSlice';
 import { 
   Sparkles, LayoutDashboard, Users, UserCheck, 
-  Settings, LogOut, Search, Shield, ChevronLeft, Menu
+  Settings, LogOut, Search, ChevronLeft, Menu, Tag, Building2, Shield
 } from 'lucide-react';
 
 export default function AdminLayout() {
@@ -30,13 +30,16 @@ export default function AdminLayout() {
     ? [
         { name: 'Leads Pipeline', href: '/admin/leads', icon: Users, badge: 'Assigned Leads' },
         { name: 'B2C Customers', href: '/admin/b2c', icon: UserCheck, badge: 'Active Clients' },
+        { name: 'B2B Enterprises', href: '/admin/b2b', icon: Building2, badge: 'Corporate' },
       ]
     : [
         { name: 'Global Dashboard', href: '/admin', icon: LayoutDashboard },
         { name: 'Leads Pipeline', href: '/admin/leads', icon: Users },
         { name: 'B2C Customers', href: '/admin/b2c', icon: UserCheck },
-        { name: 'Employees & Access', href: '/admin/employees', icon: Shield, highlight: true },
-        { name: 'System Settings', href: '/admin/settings', icon: Settings },
+        { name: 'B2B Enterprises', href: '/admin/b2b', icon: Building2 },
+        { name: 'Staff & Employees', href: '/admin/employees', icon: Shield },
+        { name: 'Pricing & Plans', href: '/admin/pricing', icon: Tag },
+        { name: 'System Settings', href: '/admin/settings', icon: Settings, highlight: true },
       ];
 
   const userRefId = user?.referenceId || (isEmployee ? 'EMP-REF-UNASSIGNED' : 'ADM-REF-100001');

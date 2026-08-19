@@ -71,7 +71,8 @@ export interface IUser extends Document {
 
   explorerLearnIntent?: string;
   explorerInterestService?: string;
-  explorerOptionalBiz?: string;
+  resetPasswordOtp?: string;
+  resetPasswordExpires?: Date;
 
   createdAt: Date;
   updatedAt: Date;
@@ -98,6 +99,9 @@ const UserSchema: Schema = new Schema(
     freeAdsUsed: { type: Number, default: 0 },
     subscription: { type: String, default: null },
     billingCycle: { type: String, enum: ['MONTHLY', 'YEARLY', null], default: null },
+
+    resetPasswordOtp: { type: String, default: null },
+    resetPasswordExpires: { type: Date, default: null },
 
 
     // Employee & Admin Hierarchy

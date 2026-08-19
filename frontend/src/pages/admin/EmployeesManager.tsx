@@ -3,7 +3,7 @@ import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Copy, Check, Shield, 
-  Trash2, X, Search, Lock, Filter, LogIn
+  Trash2, X, Search, Lock, Filter, LogIn, ArrowRight
 } from 'lucide-react';
 import { setCredentials } from '../../features/auth/authSlice';
 
@@ -42,12 +42,13 @@ export default function EmployeesManager() {
   const [empDesignation, setEmpDesignation] = useState('Lead Operations Specialist');
   const [empPhone, setEmpPhone] = useState('+91 98765 43210');
 
-  // Modal State - Assign Lead/Customer
+  // Modal State - Assign Lead/Customer/B2B
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-  const [assignType, setAssignType] = useState<'LEAD' | 'CUSTOMER'>('LEAD');
+  const [assignType, setAssignType] = useState<'LEAD' | 'B2C' | 'B2B'>('LEAD');
   const [leadsList, setLeadsList] = useState<any[]>([]);
   const [customersList, setCustomersList] = useState<any[]>([]);
+  const [b2bList, setB2bList] = useState<any[]>([]);
   const [selectedTargetId, setSelectedTargetId] = useState('');
 
   // Initial Data Load
@@ -67,12 +68,13 @@ export default function EmployeesManager() {
     setEmployees(employeeUsers);
   };
 
-
-
   const loadLeadsAndCustomers = () => {
     const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    const customers = mockUsers.filter((u: any) => u.accountType === 'B2C' || u.role === 'CUSTOMER');
+    const customers = mockUsers.filter((u: any) => u.customerType === 'B2C' || u.accountType === 'B2C' || u.role === 'CUSTOMER');
     setCustomersList(customers);
+
+    const b2b = mockUsers.filter((u: any) => u.customerType === 'B2B' || u.accountType === 'B2B');
+    setB2bList(b2b);
 
     const mockLeads = JSON.parse(localStorage.getItem('mock_leads') || '[]');
     setLeadsList(mockLeads);
@@ -201,7 +203,7 @@ export default function EmployeesManager() {
 
     if (assignType === 'LEAD') {
       const mockLeads = JSON.parse(localStorage.getItem('mock_leads') || '[]');
-      const idx = mockLeads.findIndex((l: any) => l._id === selectedTargetId || l.referenceId === selectedTargetId);
+      const idx = mockLeads.findIndex((l: any) => l._id === selectedTargetId || l.referenceId === selectedTargetId || l.id === selectedTargetId);
       if (idx !== -1) {
         mockLeads[idx].assignedEmployeeRefId = selectedEmployee.referenceId;
         mockLeads[idx].assignedEmployeeName = selectedEmployee.name;
@@ -213,10 +215,11 @@ export default function EmployeesManager() {
       setEmployees(updated);
     } else {
       const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
-      const idx = mockUsers.findIndex((u: any) => u._id === selectedTargetId || u.referenceId === selectedTargetId);
+      const idx = mockUsers.findIndex((u: any) => u._id === selectedTargetId || u.referenceId === selectedTargetId || u.email === selectedTargetId);
       if (idx !== -1) {
         mockUsers[idx].assignedEmployeeRefId = selectedEmployee.referenceId;
         mockUsers[idx].assignedEmployeeName = selectedEmployee.name;
+        mockUsers[idx].employeeName = selectedEmployee.name;
         localStorage.setItem('mock_users', JSON.stringify(mockUsers));
       }
 
@@ -226,7 +229,7 @@ export default function EmployeesManager() {
 
     setIsAssignModalOpen(false);
     setSelectedTargetId('');
-    alert(`Assigned successfully to ${selectedEmployee.name} (${selectedEmployee.referenceId})!`);
+    alert(`Assigned ${assignType === 'LEAD' ? 'Lead' : assignType === 'B2B' ? 'B2B Enterprise' : 'B2C Customer'} successfully to ${selectedEmployee.name} (${selectedEmployee.referenceId})!`);
   };
 
   // Filtered list
@@ -478,19 +481,29 @@ export default function EmployeesManager() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl p-8 max-w-xl w-full shadow-2xl border border-zinc-200 animate-in zoom-in-95 duration-200 space-y-6">
             
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-center border-b border-zinc-100 pb-4">
               <div>
                 <h2 className="text-2xl font-black text-black font-display">Create Employee Credentials</h2>
                 <p className="text-xs text-zinc-500 font-medium mt-1">
                   Generated employee can log in to view Leads & Customers. Ad generation is locked to Admin.
                 </p>
               </div>
-              <button 
-                onClick={() => setIsCreateModalOpen(false)} 
-                className="p-2 rounded-xl bg-zinc-100 text-black hover:bg-zinc-200 border border-zinc-200"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button" 
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="px-3.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-black font-bold text-xs rounded-xl flex items-center gap-1.5 border border-zinc-200"
+                >
+                  <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                  <span>Go Back</span>
+                </button>
+                <button 
+                  onClick={() => setIsCreateModalOpen(false)} 
+                  className="p-2 rounded-xl bg-zinc-100 text-black hover:bg-zinc-200 border border-zinc-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleCreateEmployee} className="space-y-4">
@@ -627,10 +640,10 @@ export default function EmployeesManager() {
             <form onSubmit={handleAssignSubmit} className="space-y-4">
               
               {/* Type Switcher */}
-              <div className="grid grid-cols-2 gap-2 p-1.5 bg-zinc-100 rounded-2xl border border-zinc-200">
+              <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-zinc-100 rounded-2xl border border-zinc-200">
                 <button
                   type="button"
-                  onClick={() => setAssignType('LEAD')}
+                  onClick={() => { setAssignType('LEAD'); setSelectedTargetId(''); }}
                   className={`py-2 text-xs font-black rounded-xl transition-all ${
                     assignType === 'LEAD' ? 'bg-red-600 text-white shadow-sm' : 'text-zinc-700'
                   }`}
@@ -639,19 +652,28 @@ export default function EmployeesManager() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setAssignType('CUSTOMER')}
+                  onClick={() => { setAssignType('B2C'); setSelectedTargetId(''); }}
                   className={`py-2 text-xs font-black rounded-xl transition-all ${
-                    assignType === 'CUSTOMER' ? 'bg-red-600 text-white shadow-sm' : 'text-zinc-700'
+                    assignType === 'B2C' ? 'bg-red-600 text-white shadow-sm' : 'text-zinc-700'
                   }`}
                 >
-                  Assign B2C Customer
+                  Assign B2C
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAssignType('B2B'); setSelectedTargetId(''); }}
+                  className={`py-2 text-xs font-black rounded-xl transition-all ${
+                    assignType === 'B2B' ? 'bg-red-600 text-white shadow-sm' : 'text-zinc-700'
+                  }`}
+                >
+                  Assign B2B
                 </button>
               </div>
 
               {/* Selector */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                  Select {assignType === 'LEAD' ? 'Lead Application' : 'B2C Customer Account'}
+                  Select {assignType === 'LEAD' ? 'Lead Application' : assignType === 'B2B' ? 'B2B Enterprise Company' : 'B2C Customer Account'}
                 </label>
                 <select
                   required
@@ -662,13 +684,19 @@ export default function EmployeesManager() {
                   <option value="">-- Choose from Database --</option>
                   {assignType === 'LEAD' ? (
                     leadsList.map((lead) => (
-                      <option key={lead._id || lead.referenceId} value={lead._id || lead.referenceId}>
+                      <option key={lead._id || lead.referenceId || lead.id} value={lead._id || lead.referenceId || lead.id}>
                         {lead.name} ({lead.referenceId || 'LEAD'}) - {lead.email}
+                      </option>
+                    ))
+                  ) : assignType === 'B2B' ? (
+                    b2bList.map((b) => (
+                      <option key={b._id || b.referenceId || b.id} value={b._id || b.referenceId || b.email}>
+                        {b.companyName || b.name} ({b.referenceId || 'B2B'}) - {b.email}
                       </option>
                     ))
                   ) : (
                     customersList.map((cust) => (
-                      <option key={cust._id || cust.referenceId} value={cust._id || cust.referenceId}>
+                      <option key={cust._id || cust.referenceId || cust.id} value={cust._id || cust.referenceId || cust.email}>
                         {cust.firstName ? `${cust.firstName} ${cust.lastName || ''}` : cust.name} ({cust.referenceId || 'CUST'}) - {cust.email}
                       </option>
                     ))

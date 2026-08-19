@@ -5,8 +5,7 @@ import {
   Sparkles, ArrowRight, CheckCircle2, Lock, 
   AlertCircle, RefreshCw, Heart, MessageCircle, 
   Send, Bookmark, Building2, ShoppingBag, Check,
-  Upload, Link2, X
-
+  Upload, Link2, X, ArrowLeft
 } from 'lucide-react';
 
 import { setCredentials } from '../../features/auth/authSlice';
@@ -56,6 +55,12 @@ export default function ExplorerFreeAdPage() {
   const navigate = useNavigate();
 
   const customerType = user?.customerType || 'EXPLORER';
+
+  useEffect(() => {
+    if (user && (customerType === 'B2C' || customerType === 'B2B')) {
+      navigate(customerType === 'B2B' ? '/b2b' : '/b2c', { replace: true });
+    }
+  }, [user, customerType, navigate]);
 
   // Server/DB source of truth for free ad usage
   const freeAdsUsed = user?.freeAdsUsed ?? (user?.freeAdGenerated ? 1 : 0);
@@ -127,36 +132,12 @@ export default function ExplorerFreeAdPage() {
     }
   };
 
-  // Security Check: If user is not an Explorer, redirect them away
-  useEffect(() => {
-    if (user && customerType === 'B2B') {
-      navigate('/b2b');
-    } else if (user && customerType === 'B2C') {
-      navigate('/b2c');
-    }
-  }, [user, customerType, navigate]);
-
-  if (!user) {
-    return (
-      <div className="max-w-md mx-auto py-24 px-6 text-center font-sans">
-        <div className="w-16 h-16 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto mb-4 border border-red-200">
-          <Lock className="w-8 h-8 text-red-600" />
-        </div>
-        <h1 className="text-2xl font-black text-black font-display">Authentication Required</h1>
-        <p className="text-zinc-600 mt-2 text-xs font-medium">Please sign in or create an Explorer account to claim your 1 Free AI advertisement.</p>
-        <Link to="/login?redirect=free-ad" className="btn-shimmer inline-block mt-4 px-6 py-3 bg-red-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md">
-          Sign In to Access
-        </Link>
-      </div>
-    );
-  }
-
   // Submit Free Ad Generation
   const handleGenerate = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (isFreeAdUsed) {
-      alert("Your 1 Free Advertisement has already been claimed. Please choose B2B or B2C in your profile to create more ads.");
+      alert("Your 1 Free Advertisement has already been generated. To create more ads for multiple products, you can upgrade your plan.");
       setShowConversionModal(true);
       return;
     }
@@ -196,39 +177,77 @@ export default function ExplorerFreeAdPage() {
 
       setGeneratedResult(generated);
 
-      // Persist usage server-side and in user state
-      const updatedUser = {
-        ...user,
-        freeAdsUsed: 1,
-        freeAdsRemaining: 0,
-        freeAdGenerated: true,
-        generatedFreeAd: {
-          productName,
-          category,
-          mediaUrl: visualAsset,
-          ...generated
+      // Persist usage server-side and in user state if logged in
+      if (user) {
+        const updatedUser = {
+          ...user,
+          freeAdsUsed: 1,
+          freeAdsRemaining: 0,
+          freeAdGenerated: true,
+          generatedFreeAd: {
+            productName,
+            category,
+            mediaUrl: visualAsset,
+            ...generated
+          }
+        };
+
+        dispatch(setCredentials({ user: updatedUser, token: 'mock-jwt-token' }));
+
+        // Persist in local mock DB
+        const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
+        const idx = mockUsers.findIndex((u: any) => u.email === user.email);
+        if (idx !== -1) {
+          mockUsers[idx] = updatedUser;
+          localStorage.setItem('mock_users', JSON.stringify(mockUsers));
         }
-      };
 
-      dispatch(setCredentials({ user: updatedUser, token: 'mock-jwt-token' }));
-
-      // Persist in local mock DB
-      const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
-      const idx = mockUsers.findIndex((u: any) => u.email === user.email);
-      if (idx !== -1) {
-        mockUsers[idx] = updatedUser;
-        localStorage.setItem('mock_users', JSON.stringify(mockUsers));
+        // Also add to all_b2c_requests for live Explore Showcase
+        try {
+          const allGlobal = JSON.parse(localStorage.getItem('all_b2c_requests') || '[]');
+          allGlobal.unshift({
+            id: `free-ad-${Date.now()}`,
+            headline: generated.headline,
+            productName,
+            category,
+            creativeUrl: visualAsset,
+            adType: 'Image',
+            leads: '190',
+            roas: '5.2x',
+            ctr: '4.6%',
+            purpose: productDesc,
+            description: generated.primaryText,
+            cta: generated.cta,
+            customerName: brandName || user.companyName || 'Free Ad Creator',
+            userId: user._id,
+            userEmail: user.email
+          });
+          localStorage.setItem('all_b2c_requests', JSON.stringify(allGlobal));
+        } catch (err) {
+          console.warn("Could not append to all_b2c_requests:", err);
+        }
       }
-    }, 2200);
+    }, 2000);
   };
 
 
   const currentVisualUrl = generatedResult?.generatedVisualUrl || CATEGORY_AI_VISUALS[category]?.url || CATEGORY_AI_VISUALS['Footwear'].url;
 
   return (
-    <div className="min-h-screen bg-white text-black font-sans selection:bg-red-600 selection:text-white py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="w-full min-h-screen bg-white text-black font-sans selection:bg-red-600 selection:text-white py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto space-y-6">
         
+        {/* Top-Left Back Navigation */}
+        <div className="flex justify-between items-center">
+          <Link
+            to="/explorer"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-black transition-colors px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 shadow-sm"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-zinc-500" />
+            <span>Back to Explorer Dashboard</span>
+          </Link>
+        </div>
+
         {/* Top Header Card */}
         <div className="bg-zinc-50 border border-zinc-200 rounded-3xl p-6 sm:p-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div className="space-y-2">
@@ -632,12 +651,12 @@ export default function ExplorerFreeAdPage() {
                   ) : isFreeAdUsed ? (
                     <>
                       <Lock className="w-4 h-4" />
-                      <span>Free Trial Ad Already Used</span>
+                      <span>Free Trial Ad Claimed (1 of 1 Used)</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4" />
-                      <span>Generate 1 Free AI Advertisement</span>
+                      <span>Generate 1 Free AI Ad (0 Payment Required)</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}

@@ -230,7 +230,7 @@ export default function Home() {
             <div className="grid grid-cols-2 gap-4 h-full">
               
               {/* Column 1 (Scroll Up) */}
-              <div className="space-y-4 animate-marquee">
+              <div className="space-y-4 animate-marquee hover:[animation-play-state:paused]">
                 {[...marqueeColumn1, ...marqueeColumn1].map((item, idx) => (
                   <div 
                     key={idx} 
@@ -251,7 +251,7 @@ export default function Home() {
               </div>
 
               {/* Column 2 (Scroll Down) */}
-              <div className="space-y-4 animate-marquee-reverse">
+              <div className="space-y-4 animate-marquee-reverse hover:[animation-play-state:paused]">
                 {[...marqueeColumn2, ...marqueeColumn2].map((item, idx) => (
                   <div 
                     key={idx} 
@@ -654,28 +654,53 @@ export default function Home() {
 
             {/* Calculated Output Matrix */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-200 text-center">
+              <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-200 text-center relative group hover:border-red-400 transition-colors">
                 <div className="text-[10px] font-bold uppercase text-zinc-500 mb-1">Ad Variations / mo</div>
                 <div className="text-3xl font-black text-black font-display">{estimatedAds}</div>
-                <div className="text-[10px] text-zinc-500 mt-1 font-semibold">vs 4 from agency</div>
+                <div className="text-[10px] text-zinc-500 mt-1 font-semibold">vs ~4 from traditional agency</div>
+                <div className="text-[9px] text-red-600 font-bold mt-1 bg-red-50 py-0.5 px-2 rounded-full inline-block">
+                  ~₹18 / variation
+                </div>
               </div>
 
-              <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-200 text-center">
+              <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-200 text-center relative group hover:border-red-400 transition-colors">
                 <div className="text-[10px] font-bold uppercase text-zinc-500 mb-1">Est. Audience Reach</div>
                 <div className="text-3xl font-black text-black font-display">{estimatedReach}</div>
                 <div className="text-[10px] text-zinc-500 mt-1 font-semibold">Targeted Impressions</div>
+                <div className="text-[9px] text-zinc-600 font-bold mt-1 bg-zinc-200/60 py-0.5 px-2 rounded-full inline-block">
+                  140 views / ₹1 spent
+                </div>
               </div>
 
-              <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-200 text-center">
+              <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-200 text-center relative group hover:border-red-400 transition-colors">
                 <div className="text-[10px] font-bold uppercase text-zinc-500 mb-1">Projected Leads</div>
                 <div className="text-3xl font-black text-red-600 font-display">+{estimatedLeads}</div>
                 <div className="text-[10px] text-zinc-500 mt-1 font-semibold">Qualified Prospects</div>
+                <div className="text-[9px] text-zinc-600 font-bold mt-1 bg-zinc-200/60 py-0.5 px-2 rounded-full inline-block">
+                  Avg ₹2.38 / inquiry
+                </div>
               </div>
 
-              <div className="bg-red-50 p-6 rounded-2xl border border-red-200 text-center">
+              <div className="bg-red-50 p-6 rounded-2xl border border-red-200 text-center relative group hover:border-red-400 transition-colors">
                 <div className="text-[10px] font-bold uppercase text-red-600 mb-1">Agency Savings</div>
                 <div className="text-3xl font-black text-red-600 font-display">₹{agencySavings}</div>
-                <div className="text-[10px] text-red-700 mt-1 font-bold">Retainer Saved</div>
+                <div className="text-[10px] text-red-700 mt-1 font-bold">Retainer Saved Monthly</div>
+                <div className="text-[9px] text-emerald-700 font-bold mt-1 bg-emerald-100 py-0.5 px-2 rounded-full inline-block">
+                  185% Cost Efficiency
+                </div>
+              </div>
+            </div>
+
+            {/* Formula Explanation Callout */}
+            <div className="bg-zinc-50 rounded-2xl p-4 sm:p-5 border border-zinc-200 text-xs text-zinc-600 space-y-2">
+              <div className="font-bold text-black flex items-center gap-2">
+                <span>💡 How we calculate your cost savings & performance metrics:</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-zinc-600 font-medium">
+                <div>• <strong className="text-black">Ad Variations:</strong> Calculated at ~₹18 per AI-generated asset compared to traditional design agencies charging ₹2,500+ per asset.</div>
+                <div>• <strong className="text-black">Audience Reach:</strong> Benchmarked on high-converting social media impressions delivering ~140 views per ₹1 invested.</div>
+                <div>• <strong className="text-black">Projected Leads:</strong> Modeled at an average high-intent lead cost of ~₹2.38 per qualified prospect.</div>
+                <div>• <strong className="text-black">Agency Savings:</strong> Direct monthly difference between a dedicated digital agency retainer (~₹{Math.round(monthlySpend * 2.85).toLocaleString()}/mo) and AD-HUNTER's automated platform.</div>
               </div>
             </div>
 

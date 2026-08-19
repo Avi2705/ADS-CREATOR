@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useSearchParams, Link } from 'react-router-dom';
 import { 
-  Building2, ShoppingBag, Edit3, Check, 
-  Lock, CheckCircle2, Compass
+  Edit3, Check, 
+  Lock, CheckCircle2, Compass, ArrowLeft,
+  CreditCard, Calendar, Sparkles
 } from 'lucide-react';
 import { setCredentials } from '../../features/auth/authSlice';
+import { COUNTRY_CODES, getCountryRule } from '../auth/Join';
 
 export default function ProfilePage() {
   const { user } = useSelector((state: any) => state.auth);
@@ -22,14 +24,16 @@ export default function ProfilePage() {
 
   // Personal Form Fields
   const [name, setName] = useState(user?.name || user?.firstName || 'User');
-  const [mobile, setMobile] = useState(user?.mobile || user?.phone || '');
+  const [personalCountryCode, setPersonalCountryCode] = useState(user?.countryCode || '+91');
+  const [mobile, setMobile] = useState((user?.mobile || user?.phone || '').replace(/^\+\d+\s*/, ''));
   const [selectedType, setSelectedType] = useState<'EXPLORER' | 'B2B' | 'B2C'>(currentCustomerType);
 
   // Business / Company Form Fields
   const [companyName, setCompanyName] = useState(user?.companyName || '');
   const [industry, setIndustry] = useState(user?.industry || 'E-Commerce');
   const [website, setWebsite] = useState(user?.website || '');
-  const [businessPhone, setBusinessPhone] = useState(user?.companyPhone || user?.mobile || '');
+  const [businessCountryCode, setBusinessCountryCode] = useState('+91');
+  const [businessPhone, setBusinessPhone] = useState((user?.companyPhone || user?.mobile || '').replace(/^\+\d+\s*/, ''));
   const [description, setDescription] = useState(user?.description || '');
   const productCategory = Array.isArray(user?.productCategories) ? user.productCategories[0] || 'Footwear' : (user?.productCategories || 'Footwear');
 
@@ -76,6 +80,28 @@ export default function ProfilePage() {
     description !== (user.description || '') ||
     productCategory !== (Array.isArray(user.productCategories) ? user.productCategories[0] || '' : (user.productCategories || 'Footwear'));
 
+  const validatePhone = (rawPhone: string, code: string, fieldName: string): boolean => {
+    if (!rawPhone.trim()) return true;
+    const digitsOnly = rawPhone.replace(/\D/g, '');
+    if (rawPhone !== digitsOnly) {
+      alert(`${fieldName} must contain only numbers.`);
+      return false;
+    }
+    const rule = getCountryRule(code);
+    if (rule.minLength && rule.maxLength) {
+      if (digitsOnly.length < rule.minLength || digitsOnly.length > rule.maxLength) {
+        alert(`For ${rule.country} (${rule.code}), ${fieldName.toLowerCase()} must be between ${rule.minLength} and ${rule.maxLength} digits.`);
+        return false;
+      }
+    } else if (rule.length) {
+      if (digitsOnly.length !== rule.length) {
+        alert(`For ${rule.country} (${rule.code}), ${fieldName.toLowerCase()} must be exactly ${rule.length} digits. You entered ${digitsOnly.length} digits.`);
+        return false;
+      }
+    }
+    return true;
+  };
+
   // Handle Save Personal Profile
   const handleSavePersonal = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,19 +116,26 @@ export default function ProfilePage() {
       return;
     }
 
-    const updatedCustomerType = currentCustomerType === 'EXPLORER' ? selectedType : currentCustomerType;
+    if (mobile && !validatePhone(mobile, personalCountryCode, "Mobile phone number")) {
+      return;
+    }
+
+    const updatedCustomerType = selectedType;
     const updatedRole = updatedCustomerType === 'B2B' 
       ? 'BUSINESS_OWNER' 
       : updatedCustomerType === 'B2C' 
         ? 'CUSTOMER' 
         : user.role;
 
+    const formattedMobile = mobile ? `${personalCountryCode} ${mobile}` : '';
+
     const updatedUser = {
       ...user,
       name,
       firstName: name.split(' ')[0],
       lastName: name.split(' ')[1] || '',
-      mobile,
+      mobile: formattedMobile,
+      countryCode: personalCountryCode,
       customerType: updatedCustomerType,
       accountType: updatedCustomerType,
       role: updatedRole
@@ -113,9 +146,9 @@ export default function ProfilePage() {
 
     // Update local DB
     const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    const idx = mockUsers.findIndex((u: any) => u.email === user.email);
+    const idx = mockUsers.findIndex((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
     if (idx !== -1) {
-      mockUsers[idx] = updatedUser;
+      mockUsers[idx] = { ...mockUsers[idx], ...updatedUser };
       localStorage.setItem('mock_users', JSON.stringify(mockUsers));
     }
 
@@ -129,12 +162,18 @@ export default function ProfilePage() {
   const handleSaveBusiness = (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (businessPhone && !validatePhone(businessPhone, businessCountryCode, "Business phone number")) {
+      return;
+    }
+
+    const formattedBusinessPhone = businessPhone ? `${businessCountryCode} ${businessPhone}` : '';
+
     const updatedUser = {
       ...user,
       companyName,
       industry,
       website,
-      companyPhone: businessPhone,
+      companyPhone: formattedBusinessPhone,
       description,
       productCategories: [productCategory],
       mainProduct: {
@@ -150,9 +189,9 @@ export default function ProfilePage() {
 
     // Update local DB
     const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    const idx = mockUsers.findIndex((u: any) => u.email === user.email);
+    const idx = mockUsers.findIndex((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
     if (idx !== -1) {
-      mockUsers[idx] = updatedUser;
+      mockUsers[idx] = { ...mockUsers[idx], ...updatedUser };
       localStorage.setItem('mock_users', JSON.stringify(mockUsers));
     }
 
@@ -164,8 +203,19 @@ export default function ProfilePage() {
 
   return (
     <div className="w-full min-h-screen bg-white text-black font-sans selection:bg-red-600 selection:text-white py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-4xl mx-auto space-y-6">
         
+        {/* Top-Left Back Navigation */}
+        <div className="flex justify-between items-center">
+          <Link
+            to={user?.role === 'SUPER_ADMIN' ? '/admin' : currentCustomerType === 'B2B' ? '/b2b' : currentCustomerType === 'B2C' ? '/b2c' : '/explorer'}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-black transition-colors px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 border border-zinc-200"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-zinc-500" />
+            <span>Back to Dashboard</span>
+          </Link>
+        </div>
+
         {/* Success Alert Banner */}
         {successMessage && (
           <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center justify-between gap-3 text-red-700 font-bold text-xs animate-in fade-in duration-200 shadow-sm">
@@ -204,24 +254,10 @@ export default function ProfilePage() {
                 <span>Explorer Hub</span>
               </Link>
             )}
-            {currentCustomerType === 'B2B' && (
-              <Link
-                to="/b2b"
-                className="btn-shimmer px-4 py-2.5 bg-black hover:bg-zinc-900 text-white font-bold text-xs uppercase rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
-              >
-                <Building2 className="w-3.5 h-3.5 text-red-500" />
-                <span>B2B Dashboard</span>
-              </Link>
-            )}
-            {currentCustomerType === 'B2C' && (
-              <Link
-                to="/b2c"
-                className="btn-shimmer px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase rounded-xl transition-all flex items-center gap-1.5 shadow-sm shadow-red-600/20"
-              >
-                <ShoppingBag className="w-3.5 h-3.5" />
-                <span>B2C Ad Portal</span>
-              </Link>
-            )}
+            <div className="p-3 bg-white border border-zinc-200 rounded-2xl flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <span className="text-xs font-bold text-zinc-700">Account Active</span>
+            </div>
           </div>
         </div>
 
@@ -229,9 +265,23 @@ export default function ProfilePage() {
         <div className="bg-white border border-zinc-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
           
           <div className="flex justify-between items-center border-b border-zinc-100 pb-4">
-            <div>
-              <h2 className="text-lg font-black text-black font-display">Profile & Account Type</h2>
-              <p className="text-xs text-zinc-500 font-medium mt-0.5">Manage identity credentials and commercial account classification.</p>
+            <div className="flex items-center gap-2">
+              {isEditingPersonal && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditingPersonal(false)}
+                  className="p-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-black transition-colors flex items-center gap-1 text-xs font-bold mr-1"
+                  title="Cancel Edit"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+              )}
+              <div>
+                <h2 className="text-lg font-black text-black font-display">
+                  {isEditingPersonal ? 'Edit Profile & Account Type' : 'Profile & Account Type'}
+                </h2>
+                <p className="text-xs text-zinc-500 font-medium mt-0.5">Manage identity credentials and commercial account classification.</p>
+              </div>
             </div>
 
             {/* In View Mode: Edit Profile button is displayed. NEVER SAVE. */}
@@ -409,14 +459,28 @@ export default function ProfilePage() {
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Mobile Phone *</label>
-                  <input
-                    type="text"
-                    required
-                    value={mobile}
-                    onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))}
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
-                    placeholder="10-digit mobile number"
-                  />
+                  <div className="flex gap-2">
+                    <select
+                      value={personalCountryCode}
+                      onChange={e => setPersonalCountryCode(e.target.value)}
+                      className="px-3 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600 w-28"
+                    >
+                      {COUNTRY_CODES.map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="tel"
+                      required
+                      value={mobile}
+                      maxLength={getCountryRule(personalCountryCode).maxLength || getCountryRule(personalCountryCode).length}
+                      onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))}
+                      className="flex-1 px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                      placeholder={getCountryRule(personalCountryCode).placeholder}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -426,7 +490,8 @@ export default function ProfilePage() {
                   type="button"
                   onClick={() => {
                     setName(user.name || user.firstName || 'User');
-                    setMobile(user.mobile || user.phone || '');
+                    setMobile((user.mobile || user.phone || '').replace(/^\+\d+\s*/, ''));
+                    setPersonalCountryCode(user.countryCode || '+91');
                     setSelectedType(currentCustomerType);
                     setIsEditingPersonal(false);
                   }}
@@ -458,15 +523,29 @@ export default function ProfilePage() {
           <div className="bg-white border border-zinc-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
             
             <div className="flex justify-between items-center border-b border-zinc-100 pb-4">
-              <div>
-                <h2 className="text-lg font-black text-black font-display">
-                  {currentCustomerType === 'B2B' ? 'Company Profile' : 'Brand & Creative Profile'}
-                </h2>
-                <p className="text-xs text-zinc-500 font-medium mt-0.5">
-                  {currentCustomerType === 'B2B' 
-                    ? 'Business entity details, website, and industry parameters.'
-                    : 'Brand information utilized for generating advertising creatives.'}
-                </p>
+              <div className="flex items-center gap-2">
+                {isEditingBusiness && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingBusiness(false)}
+                    className="p-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-black transition-colors flex items-center gap-1 text-xs font-bold mr-1"
+                    title="Cancel Edit"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
+                )}
+                <div>
+                  <h2 className="text-lg font-black text-black font-display">
+                    {isEditingBusiness 
+                      ? (currentCustomerType === 'B2B' ? 'Edit Company Profile' : 'Edit Brand Profile')
+                      : (currentCustomerType === 'B2B' ? 'Company Profile' : 'Brand & Creative Profile')}
+                  </h2>
+                  <p className="text-xs text-zinc-500 font-medium mt-0.5">
+                    {currentCustomerType === 'B2B' 
+                      ? 'Business entity details, website, and industry parameters.'
+                      : 'Brand information utilized for generating advertising creatives.'}
+                  </p>
+                </div>
               </div>
 
               {/* In View Mode: Edit Profile button is displayed. NEVER SAVE. */}
@@ -559,13 +638,27 @@ export default function ProfilePage() {
 
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Business Phone</label>
-                    <input
-                      type="text"
-                      value={businessPhone}
-                      onChange={(e) => setBusinessPhone(e.target.value)}
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
-                      placeholder="+91 98765 43210"
-                    />
+                    <div className="flex gap-2">
+                      <select
+                        value={businessCountryCode}
+                        onChange={e => setBusinessCountryCode(e.target.value)}
+                        className="px-3 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600 w-28"
+                      >
+                        {COUNTRY_CODES.map(c => (
+                          <option key={c.code} value={c.code}>
+                            {c.flag} {c.code}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="tel"
+                        value={businessPhone}
+                        maxLength={getCountryRule(businessCountryCode).maxLength || getCountryRule(businessCountryCode).length}
+                        onChange={(e) => setBusinessPhone(e.target.value.replace(/\D/g, ''))}
+                        className="flex-1 px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                        placeholder={getCountryRule(businessCountryCode).placeholder}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -614,6 +707,180 @@ export default function ProfilePage() {
 
           </div>
         )}
+
+        {/* SECTION 3: SUBSCRIPTION & BILLING LIFECYCLE */}
+        <div className="bg-white border border-zinc-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+          <div className="flex justify-between items-center border-b border-zinc-100 pb-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-50 text-red-600 font-black text-[10px] uppercase tracking-wider mb-1">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Subscription Lifecycle</span>
+              </div>
+              <h2 className="text-lg font-black text-black font-display">Commercial Plan & Billing Status</h2>
+              <p className="text-xs text-zinc-500 font-medium mt-0.5">Track your active plan entitlement, monthly validity, and renewal status.</p>
+            </div>
+
+            {user?.subscription && (
+              <div className="flex items-center gap-2">
+                {user.paymentStatus === 'PAID' && (user.subscriptionExpiresAt ? Date.now() < Number(user.subscriptionExpiresAt) : true) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const expiredTimestamp = Date.now() - 1000;
+                      const updated = {
+                        ...user,
+                        paymentStatus: 'EXPIRED',
+                        subscriptionExpiresAt: expiredTimestamp,
+                        subscriptionExpiryDate: new Date(expiredTimestamp).toLocaleDateString()
+                      };
+                      dispatch(setCredentials({ user: updated, token: 'mock-jwt-token' }));
+                      const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
+                      const idx = mockUsers.findIndex((u: any) => u.email === user.email);
+                      if (idx !== -1) {
+                        mockUsers[idx] = updated;
+                        localStorage.setItem('mock_users', JSON.stringify(mockUsers));
+                      }
+                      setSuccessMessage("Simulated 1 month passed: Plan is now expired and Payment Due button is active!");
+                      setTimeout(() => setSuccessMessage(null), 4000);
+                    }}
+                    className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold text-[11px] rounded-xl border border-zinc-200 transition-colors"
+                    title="Simulate 30 days passing to test payment renewal"
+                  >
+                    ⏱️ Test 1 Month Expiry
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const freshExpiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
+                      const updated = {
+                        ...user,
+                        paymentStatus: 'PAID',
+                        subscriptionStatus: 'ACTIVE',
+                        subscriptionExpiresAt: freshExpiry,
+                        subscriptionExpiryDate: new Date(freshExpiry).toLocaleDateString()
+                      };
+                      dispatch(setCredentials({ user: updated, token: 'mock-jwt-token' }));
+                      const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
+                      const idx = mockUsers.findIndex((u: any) => u.email === user.email);
+                      if (idx !== -1) {
+                        mockUsers[idx] = updated;
+                        localStorage.setItem('mock_users', JSON.stringify(mockUsers));
+                      }
+                      setSuccessMessage("Reset subscription to 1 month paid (30 days remaining)!");
+                      setTimeout(() => setSuccessMessage(null), 4000);
+                    }}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-xl shadow-sm transition-colors"
+                  >
+                    ↺ Reset 1 Month Paid
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {user?.subscription ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                
+                {/* Plan Name */}
+                <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-1">
+                  <span className="text-[10px] font-black uppercase text-zinc-400 block">Subscribed Plan</span>
+                  <div className="text-base font-black text-black">{user.subscription}</div>
+                  <span className="text-xs text-zinc-500 font-semibold">{user.billingCycle || 'Monthly'} Billing Cycle</span>
+                </div>
+
+                {/* Status & Validity */}
+                <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-1">
+                  <span className="text-[10px] font-black uppercase text-zinc-400 block">Payment & Validity</span>
+                  {user.paymentStatus === 'PAID' && (user.subscriptionExpiresAt ? Date.now() < Number(user.subscriptionExpiresAt) : true) ? (
+                    <div>
+                      <span className="inline-flex items-center gap-1 text-emerald-700 font-black text-xs uppercase bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Paid for 1 Month</span>
+                      </span>
+                      <div className="text-xs text-zinc-600 font-bold mt-1.5">
+                        {user.subscriptionExpiresAt 
+                          ? `${Math.max(0, Math.ceil((Number(user.subscriptionExpiresAt) - Date.now()) / (1000 * 60 * 60 * 24)))} Days Remaining`
+                          : 'Active Monthly'}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <span className="inline-flex items-center gap-1 text-red-700 font-black text-xs uppercase bg-red-50 px-2.5 py-0.5 rounded-lg border border-red-200">
+                        <CreditCard className="w-3.5 h-3.5" />
+                        <span>Payment Due (1 Month Expired)</span>
+                      </span>
+                      <div className="text-xs text-red-600 font-bold mt-1.5">
+                        Renewal required to maintain active studio deliverables
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Expiration Date */}
+                <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-1">
+                  <span className="text-[10px] font-black uppercase text-zinc-400 block">Next Renewal / Expiry</span>
+                  <div className="text-sm font-black text-black flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-zinc-500" />
+                    <span>{user.subscriptionExpiryDate || 'In 30 Days'}</span>
+                  </div>
+                  <span className="text-[11px] text-zinc-500 font-medium">Subscribed: {user.subscriptionDate || 'Recent'}</span>
+                </div>
+
+              </div>
+
+              {/* Payment Action Bar */}
+              {user.paymentStatus === 'PAID' && (user.subscriptionExpiresAt ? Date.now() < Number(user.subscriptionExpiresAt) : true) ? (
+                <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-3">
+                  <div className="flex items-center gap-2 text-xs text-emerald-800 font-bold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Your subscription is fully paid for this month. All commercial tools, dispatch APIs, and creative deliverables are active.</span>
+                  </div>
+                  <Link
+                    to="/pricing"
+                    className="px-4 py-2 bg-white hover:bg-zinc-50 text-black text-xs font-bold rounded-xl border border-zinc-200 shadow-sm shrink-0 transition-colors"
+                  >
+                    View All Plans
+                  </Link>
+                </div>
+              ) : (
+                <div className="p-5 bg-red-50 border border-red-200 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <div className="space-y-0.5 text-center sm:text-left">
+                    <div className="text-xs font-black text-red-700 uppercase tracking-wider">1 Month Cycle Completed</div>
+                    <p className="text-xs text-zinc-700 font-medium">
+                      Your monthly billing cycle has ended. Please pay for the upcoming month to renew and continue active campaigns.
+                    </p>
+                  </div>
+                  <Link
+                    to="/pricing"
+                    className="btn-shimmer px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md shadow-red-600/20 shrink-0 flex items-center gap-2"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    <span>Pay Subscription Now</span>
+                  </Link>
+                </div>
+              )}
+
+            </div>
+          ) : (
+            <div className="p-6 bg-zinc-50 border border-zinc-200 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="space-y-0.5 text-center sm:text-left">
+                <div className="text-xs font-black text-black uppercase tracking-wider">No Active Subscription</div>
+                <p className="text-xs text-zinc-600 font-medium">
+                  You are currently using the Explorer tier. Upgrade to a B2B or B2C plan to unlock multi-product campaigns and automated posting.
+                </p>
+              </div>
+              <Link
+                to="/pricing"
+                className="btn-shimmer px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md shadow-red-600/20 shrink-0"
+              >
+                <span>View Plans & Subscribe</span>
+              </Link>
+            </div>
+          )}
+
+        </div>
 
       </div>
     </div>

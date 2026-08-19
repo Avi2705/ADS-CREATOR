@@ -40,13 +40,16 @@ export default function PublicNavbar() {
     return 'Explorer Account';
   };
 
-  // Pricing tab is strictly visible only to logged-in users
+  const isSubscribedOrActive = customerType === 'B2B' || customerType === 'B2C' || !!user?.subscription;
+
   const navLinks = [
     { name: 'Home', path: '/' },
     { name: 'Explore Ads', path: '/explore' },
-    ...(user && customerType === 'EXPLORER' ? [{ name: 'Explorer Hub', path: '/explorer' }] : []),
-    ...(user && !user.freeAdGenerated ? [{ name: '⚡ 1 Free Ad', path: '/free-ad' }] : []),
-    ...(user ? [{ name: 'Pricing', path: '/pricing' }] : []),
+    ...(user && !isSubscribedOrActive ? [{ name: 'Explorer Hub', path: '/explorer' }] : []),
+    ...(user && !isSubscribedOrActive && !user?.freeAdGenerated ? [{ name: '⚡ 1 Free Ad', path: '/free-ad' }] : []),
+    ...(user && customerType === 'B2C' ? [{ name: 'B2C Portal', path: '/b2c' }] : []),
+    ...(user && customerType === 'B2B' ? [{ name: 'B2B Dashboard', path: '/b2b' }] : []),
+    { name: 'Pricing', path: '/pricing' },
     { name: 'Contact', path: '/contact' },
   ];
 
