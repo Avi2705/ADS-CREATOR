@@ -188,7 +188,7 @@ exports.getEmployees = getEmployees;
 const assignLeadToEmployee = async (req, res) => {
     try {
         const { leadId, employeeRefId, employeeName } = req.body;
-        const lead = await lead_model_1.default.findByIdAndUpdate(leadId, { assignedEmployeeRefId: employeeRefId, assignedEmployeeName: employeeName }, { new: true });
+        const lead = await lead_model_1.default.findByIdAndUpdate(leadId, { assignedEmployeeRefId: employeeRefId, assignedEmployeeName: employeeName }, { returnDocument: 'after' });
         if (!lead)
             return res.status(404).json({ success: false, message: 'Lead not found' });
         // Update employee assigned count

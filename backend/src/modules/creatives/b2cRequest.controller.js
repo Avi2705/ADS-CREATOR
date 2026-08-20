@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.adminPublishCreative = exports.adminCreateVideo = exports.adminCreateAd = exports.getAllB2CRequests = exports.approveCreative = exports.requestRevision = exports.getMyRequests = exports.createB2CRequest = void 0;
+const mongoose_1 = __importDefault(require("mongoose"));
 const b2cRequest_model_1 = __importDefault(require("./b2cRequest.model"));
 const user_model_1 = __importDefault(require("../users/user.model"));
 const AuditLog_1 = __importDefault(require("../admin/models/AuditLog"));
@@ -15,13 +16,33 @@ const createB2CRequest = async (req, res) => {
             res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
             return;
         }
-        const user = await user_model_1.default.findById(userId);
+        let user = null;
+        if (mongoose_1.default.Types.ObjectId.isValid(userId)) {
+            user = await user_model_1.default.findById(userId);
+        }
         if (!user) {
-            res.status(404).json({ success: false, error: { code: 'USER_NOT_FOUND', message: 'User account not found' } });
-            return;
+            user = await user_model_1.default.findOne({
+                $or: [
+                    { referenceId: String(userId) },
+                    { email: String(userId).toLowerCase() }
+                ]
+            });
+        }
+        // Fallback virtual user for lead / non-mongo ID
+        if (!user) {
+            user = {
+                _id: userId,
+                referenceId: String(userId),
+                name: 'B2C Customer',
+                email: 'customer@adhunter.com',
+                customerType: 'B2C',
+                role: 'CUSTOMER',
+                companyName: 'Brand Partner',
+                tenantId: null
+            };
         }
         // Role/CustomerType validation
-        if (user.customerType !== 'B2C' && user.role !== 'SUPER_ADMIN') {
+        if (user.customerType !== 'B2C' && user.role !== 'SUPER_ADMIN' && user.role !== 'CUSTOMER') {
             res.status(403).json({
                 success: false,
                 error: {
@@ -44,7 +65,7 @@ const createB2CRequest = async (req, res) => {
         }
         // Check existing ads for this specific product under user's subscription
         const existingCount = await b2cRequest_model_1.default.countDocuments({
-            customerId: user._id,
+            $or: [{ customerId: user._id }, { customerRefId: user.referenceId }],
             productName
         });
         const userSub = user.subscription || 'B2C Basic Plan';
@@ -85,14 +106,19 @@ const createB2CRequest = async (req, res) => {
             creativeAssets: [],
             revisions: []
         });
-        await AuditLog_1.default.create({
-            actorId: user._id,
-            actorName: user.name || 'B2C Client',
-            action: 'CREATE_B2C_REQUEST',
-            entity: 'B2CRequest',
-            entityId: newRequest._id.toString(),
-            newValue: { referenceId, productName, adType }
-        });
+        try {
+            await AuditLog_1.default.create({
+                actorId: mongoose_1.default.Types.ObjectId.isValid(user._id) ? user._id : undefined,
+                actorName: user.name || 'B2C Client',
+                action: 'CREATE_B2C_REQUEST',
+                entity: 'B2CRequest',
+                entityId: newRequest._id.toString(),
+                newValue: { referenceId, productName, adType }
+            });
+        }
+        catch (auditErr) {
+            console.warn("AuditLog skipped for non-mongo actorId:", auditErr);
+        }
         res.status(201).json({
             success: true,
             message: 'Advertisement request submitted successfully.',
@@ -113,7 +139,14 @@ const getMyRequests = async (req, res) => {
             res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
             return;
         }
-        const requests = await b2cRequest_model_1.default.find({ customerId: userId }).sort({ createdAt: -1 });
+        const query = {
+            $or: [
+                { customerId: userId },
+                { customerRefId: String(userId) },
+                { customerEmail: String(userId).toLowerCase() }
+            ]
+        };
+        const requests = await b2cRequest_model_1.default.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: requests });
     }
     catch (error) {

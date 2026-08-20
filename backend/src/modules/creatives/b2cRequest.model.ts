@@ -18,7 +18,7 @@ export interface IB2CRevisionNote {
 
 export interface IB2CRequest extends Document {
   referenceId: string;
-  customerId: mongoose.Types.ObjectId;
+  customerId: any;
   customerRefId?: string;
   customerName?: string;
   customerEmail?: string;
@@ -85,7 +85,7 @@ const RevisionNoteSchema = new Schema({
 const B2CRequestSchema: Schema = new Schema(
   {
     referenceId: { type: String, required: true, unique: true, index: true },
-    customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    customerId: { type: Schema.Types.Mixed, required: true, index: true },
     customerRefId: { type: String },
     customerName: { type: String },
     customerEmail: { type: String },

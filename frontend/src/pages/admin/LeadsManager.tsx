@@ -27,11 +27,30 @@ export default function LeadsManager() {
   const [searchTerm, setSearchTerm] = useState('');
   const [intentFilter, setIntentFilter] = useState('All');
 
-  
   // Selected Lead Modal details
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
+
+  // Live Webhook Interactions State
+  const [interactions, setInteractions] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchInteractions = () => {
+      fetch('http://localhost:3000/api/leads/interactions')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.interactions)) {
+            setInteractions(data.interactions);
+          }
+        })
+        .catch(err => console.warn('Failed to load interactions:', err));
+    };
+
+    fetchInteractions();
+    const interval = setInterval(fetchInteractions, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Manual Creation States
   const [isCreateLeadModalOpen, setIsCreateLeadModalOpen] = useState(false);
@@ -344,6 +363,79 @@ export default function LeadsManager() {
           </div>
           <div className="text-[10px] text-red-700 font-bold">Leads become Customers upon payment</div>
         </div>
+      </div>
+
+      {/* Real-Time Meta Webhook Interactions Stream (Likes, Comments, Shares, Clicks, Leads) */}
+      <div className="bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm space-y-4">
+        <div className="flex justify-between items-center border-b border-zinc-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <h2 className="text-lg font-black text-black font-display">Live Meta Webhook Activity Stream</h2>
+            </div>
+            <p className="text-xs text-zinc-500 font-medium mt-0.5">
+              Real-time user clicks, likes, comments, shares & instant lead submissions captured via Meta Webhook API.
+            </p>
+          </div>
+          <span className="px-3 py-1 bg-emerald-50 text-emerald-700 font-black text-[10px] uppercase rounded-full border border-emerald-200">
+            {interactions.length} Active Events
+          </span>
+        </div>
+
+        {interactions.length === 0 ? (
+          <div className="p-8 text-center bg-zinc-50 rounded-2xl border border-dashed border-zinc-200">
+            <p className="text-xs font-bold text-zinc-500">Listening for live Meta Webhook activity...</p>
+            <p className="text-[11px] text-zinc-400 font-medium mt-1">When users click, like, comment, or share your ads on Facebook/Instagram, events appear here instantly.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-zinc-200 text-zinc-600 font-bold uppercase text-[10px] bg-zinc-50">
+                  <th className="p-3">User & Prospect</th>
+                  <th className="p-3">Interaction Type</th>
+                  <th className="p-3">Platform</th>
+                  <th className="p-3">Comment / Details</th>
+                  <th className="p-3 text-right">Timestamp</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {interactions.map((item, idx) => (
+                  <tr key={item._id || item.referenceId || idx} className="hover:bg-zinc-50/80 transition-colors">
+                    <td className="p-3">
+                      <div className="font-black text-black">{item.userName || 'Meta User'}</div>
+                      <div className="text-[10px] text-zinc-500 font-mono">{item.userEmail || item.userPhone || item.referenceId}</div>
+                    </td>
+                    <td className="p-3">
+                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase inline-block ${
+                        item.interactionType === 'LIKE' ? 'bg-pink-100 text-pink-700 border border-pink-200' :
+                        item.interactionType === 'COMMENT' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                        item.interactionType === 'SHARE' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
+                        item.interactionType === 'LEAD' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                        'bg-zinc-100 text-zinc-700 border border-zinc-200'
+                      }`}>
+                        {item.interactionType === 'LIKE' && '❤️ Like'}
+                        {item.interactionType === 'COMMENT' && '💬 Comment'}
+                        {item.interactionType === 'SHARE' && '🔄 Share'}
+                        {item.interactionType === 'CLICK' && '🎯 Click'}
+                        {item.interactionType === 'LEAD' && '⚡ Instant Lead'}
+                      </span>
+                    </td>
+                    <td className="p-3 font-bold text-zinc-700">
+                      {item.platform === 'Instagram' ? '📸 Instagram' : '👥 Facebook'}
+                    </td>
+                    <td className="p-3 text-zinc-600 font-medium max-w-xs truncate">
+                      {item.commentText || item.notes || `Post ID: ${item.postId || 'N/A'}`}
+                    </td>
+                    <td className="p-3 text-right text-[11px] text-zinc-500 font-mono">
+                      {new Date(item.createdAt || Date.now()).toLocaleTimeString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Toolbar */}

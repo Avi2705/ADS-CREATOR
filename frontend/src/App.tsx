@@ -1,4 +1,5 @@
-import { Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import PublicNavbar from './components/layout/PublicNavbar';
 import Footer from './components/layout/Footer';
 import Home from './pages/public/Home';
@@ -23,9 +24,18 @@ import ExplorerFreeAdPage from './pages/public/ExplorerFreeAdPage';
 import EmployeesManager from './pages/admin/EmployeesManager';
 import AdminPricingManager from './pages/admin/AdminPricingManager';
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
 function App() {
   return (
     <div className="min-h-screen bg-white text-black font-sans flex flex-col selection:bg-red-600 selection:text-white">
+      <ScrollToTop />
       <Routes>
         {/* Public Routes with Navbar and Footer */}
         <Route path="/" element={<><PublicNavbar /><main className="flex-1"><Home /></main><Footer /></>} />

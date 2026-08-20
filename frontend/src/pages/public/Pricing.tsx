@@ -330,9 +330,20 @@ export default function Pricing() {
 
       </div>
 
-      {/* 3 Unified Plans Grid */}
+      {/* 3 Unified Plans Grid (Filtered by B2C vs B2B User Role) */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch mb-24">
-        {plans.map((plan, i) => {
+        {plans
+          .filter(plan => {
+            const userType = user?.customerType || user?.accountType;
+            if (userType === 'B2C') {
+              return plan.category === 'B2C' || !plan.requiresVerification;
+            }
+            if (userType === 'B2B') {
+              return plan.category === 'B2B' || plan.requiresVerification;
+            }
+            return true; // Show all plans for unauthenticated visitors or Explorers
+          })
+          .map((plan, i) => {
           const isEnterprise = plan.category === 'B2B' || plan.requiresVerification;
           const displayPrice = isYearly ? plan.yearlyPrice : plan.monthlyPrice;
           const isUserSubscribed = user?.subscription === plan.name;

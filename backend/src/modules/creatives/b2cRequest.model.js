@@ -50,7 +50,7 @@ const RevisionNoteSchema = new mongoose_1.Schema({
 }, { _id: false });
 const B2CRequestSchema = new mongoose_1.Schema({
     referenceId: { type: String, required: true, unique: true, index: true },
-    customerId: { type: mongoose_1.default.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    customerId: { type: mongoose_1.Schema.Types.Mixed, required: true, index: true },
     customerRefId: { type: String },
     customerName: { type: String },
     customerEmail: { type: String },

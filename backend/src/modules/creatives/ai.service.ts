@@ -1,3 +1,5 @@
+import { renderAndUploadAdBanner } from './adBannerRenderer.service';
+
 export interface GenerateAdParams {
   productName: string;
   productDescription?: string;
@@ -14,8 +16,8 @@ export interface GenerateAdParams {
   additionalInstructions?: string;
   hasVideoAsset?: boolean;
   customImageUrl?: string;
+  modelProvider?: 'Gemini-Flash-2.0' | 'Gemini-Pro-2.0' | 'DeepSeek-Ad-Optimizer' | 'Claude-3.5-Creative';
 }
-
 
 export interface GeneratedAdPayload {
   headline: string;
@@ -30,7 +32,6 @@ export interface GeneratedAdPayload {
   provider: string;
   generatedAt: Date;
 }
-
 
 export interface IAIProvider {
   name: string;
@@ -55,7 +56,6 @@ export class GeminiProvider implements IAIProvider {
       hasVideoAsset
     } = params;
 
-    // High-converting algorithmic marketing prompt generator
     const brand = brandName || 'AD-HUNTER Partner Brand';
     const offer = promotionalOffer || 'Special Limited-Time Launch Offer';
     const hookAudience = targetAudience || 'Modern Consumers & E-Commerce Shoppers';
@@ -72,10 +72,11 @@ export class GeminiProvider implements IAIProvider {
 
     const primaryText = `Looking for top-tier ${category.toLowerCase()} that actually delivers? Meet ${productName} by ${brand}. Engineered specifically for ${hookAudience.toLowerCase()}, ${productName} combines premium build quality, modern aesthetics, and unbeatable performance. ${sellingPoints ? `Key highlights include: ${sellingPoints}.` : ''} ${offer ? `Claim ${offer} before stock runs out.` : ''}`;
 
-    const description = `Premium ${category} crafted for excellence. ${price ? `Starting at ₹${price.toLocaleString()}.` : ''} Fast dispatch & guaranteed quality.`;
+    const description = `Premium ${category} crafted for excellence. ${price ? `Starting at ₹${price.toLocaleString('en-IN')}.` : ''} Fast dispatch & guaranteed quality.`;
 
-    const resolvedCta = cta || "I'm Interested";
-    const socialCaption = `🔥 Introducing ${productName} by #${brand.replace(/\s+/g, '')}!\n\n✨ Designed for ${hookAudience}\n🎯 Objective: ${objective}\n💥 ${offer}\n\n👉 Click "${resolvedCta}" below to express interest and claim details!\n\n#${category.replace(/\s+/g, '')} #${productName.replace(/\s+/g, '')} #AdHunter #ExclusiveDeal`;
+    const resolvedCta = cta || "Claim Offer";
+    const claimUrl = `https://adhunter.com/claim-offer?product=${encodeURIComponent(productName)}&brand=${encodeURIComponent(brand)}`;
+    const socialCaption = `🔥 ${chosenHeadline}\n\n✨ Designed by #${brand.replace(/\s+/g, '')} for ${hookAudience}\n💥 ${offer}\n\n👉 Click link to claim your offer: ${claimUrl}\n(Enter your Name, Phone, WhatsApp & Email to lock in your discount!)\n\n#${category.replace(/\s+/g, '')} #${productName.replace(/\s+/g, '')} #AdHunter #ExclusiveDeal`;
 
     const targetAudienceSuggestions = [
       `${targetAudience} interested in high-quality ${category}`,
@@ -95,8 +96,18 @@ export class GeminiProvider implements IAIProvider {
       General: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&auto=format&fit=crop&q=80'
     };
 
-    const generatedVisualUrl = params.customImageUrl || categoryVisualMap[category] || categoryVisualMap['General'];
+    const baseBgUrl = params.customImageUrl || categoryVisualMap[category] || categoryVisualMap['General'];
 
+    // Render high-converting Composite Ad Banner with Headline, Promo Pill, and CTA Overlay!
+    const generatedVisualUrl = await renderAndUploadAdBanner({
+      headline: chosenHeadline,
+      brandName: brand,
+      category,
+      promotionalOffer: offer,
+      price,
+      cta: resolvedCta,
+      bgImageUrl: baseBgUrl
+    });
 
     let videoScript: string | undefined = undefined;
     if (hasVideoAsset || objective.includes('Video')) {
@@ -113,12 +124,11 @@ export class GeminiProvider implements IAIProvider {
       targetAudienceSuggestions,
       videoScript,
       generatedVisualUrl,
-      provider: this.name,
+      provider: params.modelProvider || this.name,
       generatedAt: new Date()
     };
   }
 }
-
 
 export class AIService {
   private provider: IAIProvider;

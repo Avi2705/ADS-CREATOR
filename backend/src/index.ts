@@ -10,7 +10,11 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/adhunter_db';
-
+console.log({
+  cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+  apiKey: process.env.CLOUDINARY_API_KEY ? "LOADED" : "MISSING",
+  apiSecret: process.env.CLOUDINARY_API_SECRET ? "LOADED" : "MISSING",
+});
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   crossOriginEmbedderPolicy: false
@@ -35,6 +39,8 @@ import freeAdRoutes from './modules/creatives/freeAd.routes';
 import b2cRequestRoutes from './modules/creatives/b2cRequest.routes';
 import socialRoutes from './modules/social/social.routes';
 import uploadRoutes from './modules/upload/upload.routes';
+import leadCaptureRoutes from './modules/leads/leadCapture.routes';
+import fbWebhookRoutes from './modules/webhooks/fbWebhook.routes';
 
 // Basic health check route
 app.get('/health', (req, res) => {
@@ -50,6 +56,8 @@ app.use('/api/campaigns', campaignRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/leads', leadCaptureRoutes);
+app.use('/api/webhooks', fbWebhookRoutes);
 
 
 

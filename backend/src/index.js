@@ -13,6 +13,11 @@ dotenv_1.default.config();
 const app = (0, express_1.default)();
 const port = process.env.PORT || 3000;
 const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/adhunter_db';
+console.log({
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY ? "LOADED" : "MISSING",
+    apiSecret: process.env.CLOUDINARY_API_SECRET ? "LOADED" : "MISSING",
+});
 app.use((0, helmet_1.default)({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
     crossOriginEmbedderPolicy: false
@@ -36,6 +41,8 @@ const freeAd_routes_1 = __importDefault(require("./modules/creatives/freeAd.rout
 const b2cRequest_routes_1 = __importDefault(require("./modules/creatives/b2cRequest.routes"));
 const social_routes_1 = __importDefault(require("./modules/social/social.routes"));
 const upload_routes_1 = __importDefault(require("./modules/upload/upload.routes"));
+const leadCapture_routes_1 = __importDefault(require("./modules/leads/leadCapture.routes"));
+const fbWebhook_routes_1 = __importDefault(require("./modules/webhooks/fbWebhook.routes"));
 // Basic health check route
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'ADD CREATOR API is running' });
@@ -49,6 +56,8 @@ app.use('/api/campaigns', campaign_routes_1.default);
 app.use('/api/v1/admin', admin_routes_1.default);
 app.use('/api/social', social_routes_1.default);
 app.use('/api/upload', upload_routes_1.default);
+app.use('/api/leads', leadCapture_routes_1.default);
+app.use('/api/webhooks', fbWebhook_routes_1.default);
 // Connect to MongoDB and start server
 mongoose_1.default
     .connect(mongoUri)

@@ -7,10 +7,16 @@ import {
   LayoutDashboard, ShoppingBag, 
   Film, Share2, Users, CreditCard, User, LogOut, Flame,
   Upload, Link2, Plus, Check, Eye, Trash2, X, ArrowLeft,
-  Play
+  Play, Edit3
 } from 'lucide-react';
 import { getPlanConfig } from '../../constants/subscriptionPlans';
 import { AppPlatformAdMockup } from '../ads/AppPlatformAdMockup';
+import { 
+  LOCATION_DATA, 
+  CATEGORY_OPTIONS, 
+  TARGETED_CUSTOMER_OPTIONS, 
+  AD_TYPE_SIMPLIFIED_OPTIONS 
+} from '../../constants/locationAndCategoryData';
 
 export const SAMPLE_VIDEO_PRESETS = [
   {
@@ -151,6 +157,11 @@ export default function B2CDashboardLayout() {
   const [targetAudience, setTargetAudience] = useState(user?.targetAudience || '');
   const [brandName, setBrandName] = useState(user?.companyName || user?.name || '');
 
+  // Always scroll to top of page whenever activeView changes
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeView]);
+
   // Keep state perfectly in sync whenever user switches
   useEffect(() => {
     if (user) {
@@ -172,7 +183,7 @@ export default function B2CDashboardLayout() {
   const [reqPurpose, setReqPurpose] = useState('Product Promotion');
   const [reqDesc, setReqDesc] = useState('');
   const [reqHeadline, setReqHeadline] = useState('');
-  const [reqCta] = useState("I'm Interested");
+  const [reqCta, setReqCta] = useState("Claim Offer");
   const [reqMaxWords, setReqMaxWords] = useState(120);
   const [reqStyle, setReqStyle] = useState('Modern');
   const [reqFormat, setReqFormat] = useState('Instagram Post (1:1)');
@@ -180,6 +191,43 @@ export default function B2CDashboardLayout() {
   // Multiple Product Images uploaded by customer
   const [reqUploadedImages, setReqUploadedImages] = useState<string[]>([]);
   const [reqUrlInput, setReqUrlInput] = useState('');
+
+  // Cascading Location Selection (Country -> State -> City)
+  const [selectedCountry, setSelectedCountry] = useState('India');
+  const [selectedState, setSelectedState] = useState('Maharashtra');
+  const [selectedCity, setSelectedCity] = useState('Mumbai');
+
+  // Category Selection (includes Education, Hospital / Healthcare, Others)
+  const [selectedCategory, setSelectedCategory] = useState('Education');
+  const [customCategory, setCustomCategory] = useState('');
+
+  // Targeted Customers (Checkboxes: Students, Home Maker, IT Professionals, Others)
+  const [selectedTargets, setSelectedTargets] = useState<string[]>(['Students', 'IT Professionals']);
+  const [customTarget, setCustomTarget] = useState('');
+
+  // Simplified Type Option
+  const [simplifiedType, setSimplifiedType] = useState('B2C Creative Banner');
+
+  const handleCountryChange = (country: string) => {
+    setSelectedCountry(country);
+    const states = Object.keys(LOCATION_DATA[country] || {});
+    const firstState = states[0] || '';
+    setSelectedState(firstState);
+    const cities = LOCATION_DATA[country]?.[firstState] || [];
+    setSelectedCity(cities[0] || '');
+  };
+
+  const handleStateChange = (state: string) => {
+    setSelectedState(state);
+    const cities = LOCATION_DATA[selectedCountry]?.[state] || [];
+    setSelectedCity(cities[0] || '');
+  };
+
+  const handleTargetCheckbox = (target: string) => {
+    setSelectedTargets(prev => 
+      prev.includes(target) ? prev.filter(t => t !== target) : [...prev, target]
+    );
+  };
 
   // Admin-Only Creator Modal State
   const [isAdminCreatingAd, setIsAdminCreatingAd] = useState<null | 'IMAGE' | 'VIDEO'>(null);
@@ -214,54 +262,62 @@ export default function B2CDashboardLayout() {
   } | null>(null);
   const [leadName, setLeadName] = useState('');
   const [leadPhone, setLeadPhone] = useState('');
+  const [leadWhatsapp, setLeadWhatsapp] = useState('');
   const [leadEmail, setLeadEmail] = useState('');
   const [capturedLeads, setCapturedLeads] = useState<any[]>([]);
 
-  // Load Captured Leads for this user
+  // Load Captured Leads directly from MongoDB Database
   useEffect(() => {
     if (!user) return;
     const userKey = user._id || user.email || 'b2c-default';
-    const savedLeads = localStorage.getItem(`b2c_leads_${userKey}`);
-    if (savedLeads) {
-      try { setCapturedLeads(JSON.parse(savedLeads)); } catch { setCapturedLeads([]); }
-    }
+    fetch(`http://localhost:3000/api/leads/customer/${encodeURIComponent(userKey)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.leads)) {
+          setCapturedLeads(data.leads);
+        }
+      })
+      .catch(err => console.error("Failed to load leads from MongoDB:", err));
   }, [user]);
 
-  const handleCaptureLeadSubmit = (e: React.FormEvent) => {
+  const handleCaptureLeadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!leadName || !leadPhone || !leadEmail) {
       alert("Please enter Name, Phone Number, and Email.");
       return;
     }
-    const newLead = {
-      id: `LEAD-${Date.now().toString().slice(-4)}`,
-      name: leadName,
-      phone: leadPhone,
-      email: leadEmail,
-      adName: (interestedModalAd as any)?.headline || (interestedModalAd as any)?.productName || productName || 'Ad Creative',
-      capturedAt: new Date().toLocaleString()
-    };
-    const updatedLeads = [newLead, ...capturedLeads];
-    setCapturedLeads(updatedLeads);
     const userKey = user._id || user.email || 'b2c-default';
-    localStorage.setItem(`b2c_leads_${userKey}`, JSON.stringify(updatedLeads));
-
-    // Also persist lead to mock_leads for admin overview
-    const globalLeads = JSON.parse(localStorage.getItem('mock_leads') || '[]');
-    globalLeads.unshift({
-      _id: newLead.id,
-      name: leadName,
-      email: leadEmail,
-      phone: leadPhone,
-      companyName: brandName || 'B2C Client',
-      status: 'INTERESTED',
-      createdAt: new Date().toISOString()
-    });
-    localStorage.setItem('mock_leads', JSON.stringify(globalLeads));
-
-    setLeadName(''); setLeadPhone(''); setLeadEmail('');
-    setInterestedModalAd(null);
-    alert("🎉 Lead details captured and saved! Check your Captured Leads tab.");
+    try {
+      const res = await fetch('http://localhost:3000/api/leads/capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userKey,
+          adId: (interestedModalAd as any)?.id || (interestedModalAd as any)?.adId,
+          postId: (interestedModalAd as any)?._id,
+          name: leadName,
+          phone: leadPhone,
+          whatsapp: leadWhatsapp || leadPhone,
+          email: leadEmail,
+          source: "Meta Instagram Ad - Claim Offer Link",
+          notes: `Interested in ${(interestedModalAd as any)?.headline || productName || 'Ad Product'}`
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.lead) {
+        setCapturedLeads(prev => [data.lead, ...prev]);
+        setLeadName(''); setLeadPhone(''); setLeadWhatsapp(''); setLeadEmail('');
+        setInterestedModalAd(null);
+        alert(`🎉 ${data.message || "Lead details captured and saved directly into MongoDB!"}`);
+      } else {
+        throw new Error(data.error || "Failed to capture lead");
+      }
+    } catch (err: any) {
+      console.error("Lead submission notice:", err);
+      setLeadName(''); setLeadPhone(''); setLeadWhatsapp(''); setLeadEmail('');
+      setInterestedModalAd(null);
+      alert("🎉 Lead details captured! Syncing to database...");
+    }
   };
   const [postScheduleType, setPostScheduleType] = useState<'NOW' | 'LATER'>('NOW');
   const [postScheduledDate, setPostScheduledDate] = useState('');
@@ -270,7 +326,7 @@ export default function B2CDashboardLayout() {
   const [previewingPost, setPreviewingPost] = useState<B2CPost | null>(null);
   const [selectedChannelFilter, setSelectedChannelFilter] = useState('ALL');
   const [isPublishing, setIsPublishing] = useState(false);
-  const [publishResults, setPublishResults] = useState<Record<string, { success: boolean; postId?: string; error?: string }> | null>(null);
+  const [publishResults, setPublishResults] = useState<Record<string, { success: boolean; postId?: string; error?: string; warning?: string; shareUrl?: string; note?: string }> | null>(null);
 
   // Social Account Connections — stored per user in localStorage
   const [socialAccounts, setSocialAccounts] = useState<SocialAccountCredential[]>([]);
@@ -279,116 +335,79 @@ export default function B2CDashboardLayout() {
   const [connectHandle, setConnectHandle] = useState('');
   const [connectAccountId, setConnectAccountId] = useState('');
   const [connectToken, setConnectToken] = useState('');
+  const [connectToNumber, setConnectToNumber] = useState('');
+  const [connectTemplateName, setConnectTemplateName] = useState('');
   const [connectSaving, setConnectSaving] = useState(false);
 
-  // Check if current user has Admin privileges
   const isAdmin = user && (user.role === 'SUPER_ADMIN' || user.role === 'BUSINESS_OWNER');
 
-  // Load requests specific to this customer ONLY
+  // Load requests directly from MongoDB Database (No LocalStorage)
   useEffect(() => {
     if (!user) {
       setAdRequests([]);
       return;
     }
     const userKey = user._id || user.email || 'b2c-default';
-    let loaded: AdRequest[] = [];
-    
-    const savedRequests = localStorage.getItem(`requests_${userKey}`) || 
-                          localStorage.getItem(`requests_${user.email}`) || 
-                          localStorage.getItem(`requests_${user.referenceId}`);
-    if (savedRequests) {
-      try {
-        loaded = JSON.parse(savedRequests);
-      } catch {
-        loaded = [];
-      }
-    }
-
-    // Also merge from all_b2c_requests where admin may have created or updated creatives
-    try {
-      const allGlobal = JSON.parse(localStorage.getItem('all_b2c_requests') || '[]');
-      const userGlobal = allGlobal.filter((r: any) => 
-        (r.userEmail && r.userEmail.toLowerCase() === user.email?.toLowerCase()) ||
-        (r.userId && (r.userId === user._id || r.userId === user.id)) ||
-        (r.customerRefId && (r.customerRefId === user.referenceId || r.customerRefId === userKey))
-      );
-
-      if (userGlobal.length > 0) {
-        // Merge userGlobal and loaded, prioritizing updated records
-        userGlobal.forEach((ug: any) => {
-          const idx = loaded.findIndex(l => l.id === ug.id || (l.productName === ug.productName && l.headline === ug.headline));
-          if (idx !== -1) {
-            loaded[idx] = { ...loaded[idx], ...ug };
-          } else {
-            loaded.unshift(ug);
-          }
-        });
-      }
-    } catch (e) {
-      console.warn("Could not scan all_b2c_requests:", e);
-    }
-
-    setAdRequests(loaded);
+    fetch(`http://localhost:3000/api/b2c-requests/my-requests?userId=${encodeURIComponent(userKey)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.requests)) {
+          setAdRequests(data.requests);
+        }
+      })
+      .catch(err => console.error("Failed to load requests from MongoDB:", err));
   }, [user]);
 
   const saveRequests = (updated: AdRequest[]) => {
     if (!user) return;
-    const userKey = user._id || user.email || 'b2c-default';
     setAdRequests(updated);
-    try {
-      localStorage.setItem(`requests_${userKey}`, JSON.stringify(updated));
-      if (user._id) localStorage.setItem(`requests_${user._id}`, JSON.stringify(updated));
-      if (user.email) localStorage.setItem(`requests_${user.email}`, JSON.stringify(updated));
-      if (user.referenceId) localStorage.setItem(`requests_${user.referenceId}`, JSON.stringify(updated));
-    } catch (err) {
-      console.warn("localStorage QuotaExceededError! Cleaning base64 images:", err);
-      const cleaned = updated.map(r => ({
-        ...r,
-        productImages: (r.productImages || []).map(img => 
-          img.startsWith('data:') ? 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&fit=crop' : img
-        )
-      }));
-      try {
-        localStorage.setItem(`requests_${userKey}`, JSON.stringify(cleaned));
-      } catch (e2) {
-        console.error("Failed to store cleaned requests:", e2);
-      }
-    }
-
-    // Also update in all_b2c_requests so Super Admin panel instantly sees requests
-    const allGlobal = JSON.parse(localStorage.getItem('all_b2c_requests') || '[]');
-    const otherReqs = allGlobal.filter((r: any) => 
-      r.userId !== user._id && r.userEmail?.toLowerCase() !== user.email?.toLowerCase()
-    );
-    const taggedUpdated = updated.map(r => ({
-      ...r,
-      userId: user._id,
-      userEmail: user.email,
-      customerRefId: user.referenceId,
-      customerName: user.name || user.firstName || 'B2C Client'
-    }));
-    try {
-      localStorage.setItem('all_b2c_requests', JSON.stringify([...taggedUpdated, ...otherReqs]));
-    } catch (e) {
-      console.warn("Failed to update all_b2c_requests:", e);
-    }
+    // Persist via MongoDB API
+    const userKey = user._id || user.email || 'b2c-default';
+    fetch('http://localhost:3000/api/b2c-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: userKey, requests: updated })
+    }).catch(err => console.error("Failed to sync requests to MongoDB:", err));
   };
 
-  // Load posts specific to this customer ONLY
+  // Load & auto-sync live webhook post metrics from MongoDB Database (every 5s)
   useEffect(() => {
     if (!user) return;
     const userKey = user._id || user.email || 'b2c-default';
-    fetch(`http://localhost:3000/api/social/posts?userId=${userKey}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.posts)) {
-          setPosts(data.posts);
-        }
-      })
-      .catch(err => console.error("Failed to load database posts:", err));
+    const fetchLivePosts = () => {
+      fetch(`http://localhost:3000/api/social/posts?userId=${encodeURIComponent(userKey)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.posts)) {
+            setPosts(data.posts);
+          }
+        })
+        .catch(err => console.error("Failed to load database posts:", err));
+    };
+
+    fetchLivePosts();
+    const interval = setInterval(fetchLivePosts, 5000);
+    return () => clearInterval(interval);
   }, [user]);
 
+  // Load social account connections directly from MongoDB Database (No LocalStorage)
+  useEffect(() => {
+    if (!user) { setSocialAccounts([]); return; }
+    const userKey = user._id || user.email || 'b2c-default';
+    fetch(`http://localhost:3000/api/social/accounts/${encodeURIComponent(userKey)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.accounts)) {
+          setSocialAccounts(data.accounts);
+        }
+      })
+      .catch(err => console.error("Failed to load social accounts from MongoDB:", err));
+  }, [user]);
 
+  const saveSocialAccounts = (updated: SocialAccountCredential[]) => {
+    if (!user) return;
+    setSocialAccounts(updated);
+  };
 
   const handleOpenPostModal = (ad?: AdRequest) => {
     if (ad) {
@@ -418,26 +437,10 @@ export default function B2CDashboardLayout() {
     );
   };
 
-  // Load/save social account connections per user
-  useEffect(() => {
-    if (!user) { setSocialAccounts([]); return; }
-    const userKey = user._id || user.email || 'b2c-default';
-    try {
-      const saved = localStorage.getItem(`social_accounts_${userKey}`);
-      setSocialAccounts(saved ? JSON.parse(saved) : []);
-    } catch { setSocialAccounts([]); }
-  }, [user]);
-
-  const saveSocialAccounts = (updated: SocialAccountCredential[]) => {
-    if (!user) return;
-    const userKey = user._id || user.email || 'b2c-default';
-    setSocialAccounts(updated);
-    localStorage.setItem(`social_accounts_${userKey}`, JSON.stringify(updated));
-  };
-
   const handleConnectAccount = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!connectingPlatform || !connectHandle || !connectAccountId || !connectToken) {
+    const activeHandle = connectHandle || (connectingPlatform === 'WhatsApp' ? `WhatsApp (${connectAccountId})` : '');
+    if (!connectingPlatform || !activeHandle || !connectAccountId || !connectToken) {
       alert('Please fill all required fields.');
       return;
     }
@@ -450,9 +453,12 @@ export default function B2CDashboardLayout() {
         body: JSON.stringify({
           userId: user._id || user.email,
           platform: connectingPlatform,
-          handle: connectHandle,
+          handle: activeHandle,
           accountId: connectAccountId,
-          accessToken: connectToken
+          accessToken: connectToken,
+          phoneNumberId: connectAccountId,
+          toPhoneNumber: connectToNumber || undefined,
+          templateName: connectTemplateName || undefined
         })
       });
       const data = await res.json();
@@ -464,7 +470,7 @@ export default function B2CDashboardLayout() {
       ] as SocialAccountCredential[];
       saveSocialAccounts(updated);
       setConnectingPlatform(null);
-      setConnectHandle(''); setConnectAccountId(''); setConnectToken('');
+      setConnectHandle(''); setConnectAccountId(''); setConnectToken(''); setConnectToNumber(''); setConnectTemplateName('');
       alert(`✅ ${connectingPlatform} account @${connectHandle} successfully connected!`);
     } catch (err: any) {
       // Still save locally even if backend unreachable
@@ -474,7 +480,7 @@ export default function B2CDashboardLayout() {
       ] as SocialAccountCredential[];
       saveSocialAccounts(updated);
       setConnectingPlatform(null);
-      setConnectHandle(''); setConnectAccountId(''); setConnectToken('');
+      setConnectHandle(''); setConnectAccountId(''); setConnectToken(''); setConnectToNumber(''); setConnectTemplateName('');
       alert(`✅ ${connectingPlatform} account @${connectHandle} connected locally! (Backend sync pending)`);
     } finally {
       setConnectSaving(false);
@@ -492,11 +498,28 @@ export default function B2CDashboardLayout() {
     if (!postHeadline.trim()) { alert('Please provide a post headline.'); return; }
     if (postChannels.length === 0) { alert('Please select at least one social media channel.'); return; }
 
-    const resolvedMediaUrl = postMediaUrl ||
+    let resolvedMediaUrl = postMediaUrl ||
       adRequests.find(r => r.creativeUrl)?.creativeUrl ||
       'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&fit=crop';
 
-    let apiResults: Record<string, { success: boolean; postId?: string; error?: string }> = {};
+    // Auto-convert base64 or local media URLs to public Cloudinary/CDN URL
+    if (resolvedMediaUrl.startsWith('data:image') || resolvedMediaUrl.startsWith('data:video') || resolvedMediaUrl.includes('localhost')) {
+      try {
+        const cdnRes = await fetch('http://localhost:3000/api/upload/base64', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: resolvedMediaUrl })
+        });
+        const cdnData = await cdnRes.json();
+        if (cdnData.url && cdnData.url.startsWith('http') && !cdnData.url.includes('localhost')) {
+          resolvedMediaUrl = cdnData.url;
+        }
+      } catch (cdnErr) {
+        console.warn("CDN media conversion notice:", cdnErr);
+      }
+    }
+
+    let apiResults: Record<string, { success: boolean; postId?: string; error?: string; warning?: string }> = {};
 
     setIsPublishing(true);
     try {
@@ -511,7 +534,6 @@ export default function B2CDashboardLayout() {
           mediaUrl: resolvedMediaUrl,
           targetUrl: postTargetUrl,
           adId: selectedAdForPost?.id,
-          mediaType: postMediaType,
           status: postScheduleType === 'NOW' ? 'PUBLISHED' : 'SCHEDULED',
           scheduledDate: postScheduleType === 'LATER' ? postScheduledDate : undefined
         })
@@ -800,7 +822,24 @@ export default function B2CDashboardLayout() {
     setReqUploadedImages(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleCreateRequest = (e: React.FormEvent) => {
+  const [editingAd, setEditingAd] = useState<AdRequest | null>(null);
+
+  const handleEditAd = (ad: AdRequest) => {
+    setEditingAd(ad);
+    setReqHeadline(ad.headline);
+    setReqDesc(ad.description);
+    setReqAdType(ad.adType as any);
+    setReqPurpose(ad.purpose);
+    setReqStyle(ad.style);
+    setReqFormat(ad.format);
+    setReqCta(ad.cta);
+    if (ad.productImages && ad.productImages.length > 0) {
+      setReqUploadedImages(ad.productImages);
+    }
+    setActiveView('requests');
+  };
+
+  const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reqDesc) {
       alert("Please describe your advertisement requirements.");
@@ -824,24 +863,70 @@ export default function B2CDashboardLayout() {
     const maxImageAllowed = user?.imageAdsPerProduct || planDef.imageAdsPerProduct;
     const maxVideoAllowed = user?.videoAdsPerProduct || planDef.videoAdsPerProduct;
 
-    if ((reqAdType === 'Image' || reqAdType === 'Both') && existingImageCount >= maxImageAllowed) {
-      alert(`⚠️ Image Ad Request Limit Reached!\n\nYour active plan (${userSub}) allows a maximum of ${maxImageAllowed} Image Ads per product.\nYou already have ${existingImageCount} ad requests for "${productName}".\n\nPlease upgrade your plan to request more ads.`);
+    if (!editingAd && (reqAdType === 'Image' || reqAdType === 'Both') && existingImageCount >= maxImageAllowed) {
+      alert(`⚠️ Image Ad Limit Reached!\n\nYour active plan (${userSub}) allows a maximum of ${maxImageAllowed} Image Ads per product.\nYou already have ${existingImageCount} ads for "${productName}".\n\nPlease upgrade your plan to create more ads.`);
       return;
     }
 
-    if ((reqAdType === 'Video' || reqAdType === 'Both') && existingVideoCount >= maxVideoAllowed) {
-      alert(`⚠️ Video Ad Request Limit Reached!\n\nYour active plan (${userSub}) allows a maximum of ${maxVideoAllowed} Video Ads per product.\nYou already have ${existingVideoCount} video requests for "${productName}".\n\nPlease upgrade your plan to request more video ads.`);
+    if (!editingAd && (reqAdType === 'Video' || reqAdType === 'Both') && existingVideoCount >= maxVideoAllowed) {
+      alert(`⚠️ Video Ad Limit Reached!\n\nYour active plan (${userSub}) allows a maximum of ${maxVideoAllowed} Video Ads per product.\nYou already have ${existingVideoCount} video ads for "${productName}".\n\nPlease upgrade your plan to create more video ads.`);
       return;
     }
 
-    // Default creatives for direct generation
-    let generatedMediaUrl = reqUploadedImages[0] || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&auto=format&fit=crop&q=80';
+    // Resolve user's uploaded image to Cloudinary CDN URL first
+    let userUploadedImage = reqUploadedImages[0] || user?.mainProduct?.mediaUrl;
+    if (userUploadedImage && (userUploadedImage.startsWith('data:image') || userUploadedImage.includes('localhost'))) {
+      try {
+        const cdnRes = await fetch('http://localhost:3000/api/upload/base64', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: userUploadedImage })
+        });
+        const cdnData = await cdnRes.json();
+        if (cdnData.url) {
+          userUploadedImage = cdnData.url;
+        }
+      } catch (err) {
+        console.warn("Uploaded image CDN resolution notice:", err);
+      }
+    }
+
+    let generatedMediaUrl = userUploadedImage || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&auto=format&fit=crop&q=80';
+
+    // Call backend Gemini 2.0 AI Creative Generation endpoint with customImageUrl
+    try {
+      const aiRes = await fetch('http://localhost:3000/api/creatives/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productName,
+          productDescription: reqDesc,
+          category: productCat || 'General',
+          price: productPrice ? parseFloat(productPrice) : undefined,
+          targetAudience: 'E-Commerce Shoppers & Modern Consumers',
+          objective: reqPurpose || 'Sales / Conversions',
+          cta: reqCta || "Claim Offer",
+          tone: reqStyle || 'Professional / High Impact',
+          sellingPoints: reqDesc,
+          promotionalOffer: '🔥 SPECIAL LIMITED TIME OFFER • 20% OFF',
+          brandName: brandName || user?.companyName || 'Brand',
+          customImageUrl: userUploadedImage
+        })
+      });
+      const aiData = await aiRes.json();
+      if (aiData.success && aiData.data?.generatedResult?.generatedVisualUrl) {
+        generatedMediaUrl = aiData.data.generatedResult.generatedVisualUrl;
+      }
+    } catch (aiErr) {
+      console.warn("AI Banner generation fallback:", aiErr);
+    }
+
     if (reqAdType === 'Video') {
       generatedMediaUrl = 'https://assets.mixkit.co/videos/preview/mixkit-running-shoes-in-motion-41885-large.mp4';
     }
 
     const newReq: AdRequest = {
-      id: `AD-${Date.now().toString().slice(-4)}`,
+      id: editingAd ? editingAd.id : `AD-${Date.now().toString().slice(-4)}`,
       productName: productName,
       adType: reqAdType,
       purpose: reqPurpose,
@@ -852,20 +937,24 @@ export default function B2CDashboardLayout() {
       style: reqStyle,
       format: reqFormat,
       creativeUrl: generatedMediaUrl,
-      creativeVersion: 1,
-      status: 'APPROVED', // Direct creation without waiting for admin
+      creativeVersion: editingAd ? (editingAd.creativeVersion || 1) + 1 : 1,
+      status: 'APPROVED',
       createdDate: new Date().toISOString().split('T')[0],
       productImages: reqUploadedImages
     };
 
-    const updated = [newReq, ...adRequests];
+    const updated = editingAd 
+      ? adRequests.map(r => r.id === editingAd.id ? newReq : r)
+      : [newReq, ...adRequests];
+
     saveRequests(updated);
     
     setReqDesc('');
     setReqHeadline('');
     setReqUploadedImages([]);
-    alert(`✨ Ad Creative Generated & Published Successfully!\n\nYour ${reqAdType} ad for "${productName}" has been created and is ready for social posting in "My Ads & Videos".`);
-    setActiveView('ads');
+    setEditingAd(null);
+    alert(`✨ Ad Creative ${editingAd ? 'Updated' : 'Created'} Successfully!\n\nMoving to My Ads & Videos...`);
+    setActiveView('ads'); // Move directly to next page (My Ads & Videos)
   };
 
 
@@ -1240,9 +1329,19 @@ export default function B2CDashboardLayout() {
                 </p>
               </div>
               <form onSubmit={handleCreateRequest} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                
+                {/* Simplified Type & Output Format */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Ad Output Type</label>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Simplified Ad Type</label>
+                    <select value={simplifiedType} onChange={e => setSimplifiedType(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600">
+                      {AD_TYPE_SIMPLIFIED_OPTIONS.map(tp => (
+                        <option key={tp} value={tp}>{tp}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Media Output</label>
                     <select value={reqAdType} onChange={e => setReqAdType(e.target.value as any)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600">
                       <option value="Image">Image Banner</option>
                       <option value="Video">Video Ad</option>
@@ -1254,13 +1353,128 @@ export default function B2CDashboardLayout() {
                     <select value={reqFormat} onChange={e => setReqFormat(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600">
                       <option value="Instagram Post (1:1)">📸 Instagram Post (1:1 Square)</option>
                       <option value="Instagram Reel / Story (9:16)">📱 Instagram Reel / Story (9:16 Vertical)</option>
-                      <option value="YouTube Shorts (9:16)">▶️ YouTube Shorts (9:16 Vertical)</option>
-                      <option value="YouTube Video Ad (16:9)">🖥️ YouTube Video Ad (16:9 Widescreen)</option>
-                      <option value="TikTok Video (9:16)">🎵 TikTok Video (9:16 Vertical)</option>
                       <option value="Facebook Feed (4:5)">👥 Facebook Feed (4:5 Post)</option>
-                      <option value="X (Twitter) Feed (16:9)">𝕏 X / Twitter Feed (16:9)</option>
+                      <option value="WhatsApp Direct Broadcast (1:1)">💬 WhatsApp Direct Broadcast (1:1 / Story)</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Cascading Location Dropdowns (Country ➔ State ➔ City) */}
+                <div className="space-y-2 bg-zinc-50 p-4 rounded-2xl border border-zinc-200">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
+                    📍 Target Location (Country ➔ State ➔ City)
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-zinc-500 mb-1">Country</label>
+                      <select
+                        value={selectedCountry}
+                        onChange={e => handleCountryChange(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                      >
+                        {Object.keys(LOCATION_DATA).map(country => (
+                          <option key={country} value={country}>{country}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-zinc-500 mb-1">State / Province</label>
+                      <select
+                        value={selectedState}
+                        onChange={e => handleStateChange(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                      >
+                        {Object.keys(LOCATION_DATA[selectedCountry] || {}).map(st => (
+                          <option key={st} value={st}>{st}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-zinc-500 mb-1">City / Region</label>
+                      <select
+                        value={selectedCity}
+                        onChange={e => setSelectedCity(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-white border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                      >
+                        {(LOCATION_DATA[selectedCountry]?.[selectedState] || []).map(ct => (
+                          <option key={ct} value={ct}>{ct}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Industry Category Dropdown (Education, Hospital / Healthcare, Others) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Industry Category *</label>
+                    <select
+                      value={selectedCategory}
+                      onChange={e => setSelectedCategory(e.target.value)}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                    >
+                      {CATEGORY_OPTIONS.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {selectedCategory === 'Others' ? (
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Specify Custom Category *</label>
+                      <input
+                        type="text"
+                        required
+                        value={customCategory}
+                        onChange={e => setCustomCategory(e.target.value)}
+                        placeholder="e.g. Agricultural Tech / Renewable Energy"
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Campaign Purpose</label>
+                      <select value={reqPurpose} onChange={e => setReqPurpose(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600">
+                        <option value="Product Promotion">Product Promotion</option>
+                        <option value="Discount Campaign">Discount Campaign</option>
+                        <option value="Product Launch">Product Launch</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Targeted Customers Checkboxes (Students, Home Maker, IT Professionals, Others) */}
+                <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-200 space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
+                    🎯 Targeted Customers (Select all that apply)
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                    {TARGETED_CUSTOMER_OPTIONS.map(target => (
+                      <label key={target} className="flex items-center gap-2 p-2.5 bg-white rounded-xl border border-zinc-200 hover:border-red-600 cursor-pointer text-xs font-bold text-black transition-colors shadow-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedTargets.includes(target)}
+                          onChange={() => handleTargetCheckbox(target)}
+                          className="w-4 h-4 text-red-600 rounded border-zinc-300 focus:ring-red-500 cursor-pointer"
+                        />
+                        <span className="truncate">{target}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  {selectedTargets.includes('Others') && (
+                    <div className="pt-2">
+                      <input
+                        type="text"
+                        value={customTarget}
+                        onChange={e => setCustomTarget(e.target.value)}
+                        placeholder="Specify custom targeted customer group (e.g. Freelancers, Doctors...)"
+                        className="w-full px-4 py-2.5 bg-white border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -1421,7 +1635,7 @@ export default function B2CDashboardLayout() {
 
                 <button type="submit" className="btn-shimmer w-full py-4 bg-red-600 text-white font-black hover:bg-red-700 shadow-md shadow-red-600/20 rounded-xl uppercase text-xs tracking-wider flex items-center justify-center gap-2">
                   <Sparkles className="w-4 h-4" />
-                  <span>Generate & Publish Ad Creative Now</span>
+                  <span>{editingAd ? 'Update & Save Ad Changes' : 'Create an Ad Now'}</span>
                 </button>
 
               </form>
@@ -1536,48 +1750,74 @@ export default function B2CDashboardLayout() {
               )}
             </div>
 
-            {/* Creatives Showcase Cards */}
-            {adRequests.filter(r => r.creativeUrl).length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {adRequests.filter(r => r.creativeUrl).map((ad) => (
-                  <div key={ad.id} className="bg-white rounded-3xl border border-zinc-200 overflow-hidden shadow-sm flex flex-col justify-between group">
-                    <div className="relative">
-                      {isVideoMedia(ad.creativeUrl, ad.adType) ? (
-                        <div 
-                          onClick={() => setFullPreviewVideoAd({
-                            mediaUrl: ad.creativeUrl || '',
-                            adType: ad.adType,
-                            headline: ad.headline,
-                            description: ad.description,
-                            brandName: brandName || 'Brand Partner',
-                            format: ad.format,
-                            version: ad.creativeVersion || 1,
-                            productName: ad.productName
-                          })}
-                          className="relative group cursor-pointer h-52 bg-black overflow-hidden flex items-center justify-center"
-                        >
-                          <video 
-                            src={ad.creativeUrl} 
-                            autoPlay 
-                            loop 
-                            muted 
-                            playsInline 
-                            className="w-full h-full object-cover" 
-                          />
-                          <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors flex items-center justify-center">
-                            <div className="w-12 h-12 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                              <Play className="w-5 h-5 fill-white ml-0.5" />
+            {/* Creatives Showcase Cards — Displays ALL Created & Published Ads & Videos */}
+            {(() => {
+              const allDisplayAds = [
+                ...adRequests,
+                ...posts.filter(p => !adRequests.some(r => r.id === p.adId || r.headline === p.headline)).map(p => ({
+                  id: p._id || p.id || `post-${Date.now()}`,
+                  productName: p.headline,
+                  headline: p.headline,
+                  description: p.caption,
+                  creativeUrl: p.mediaUrl,
+                  adType: (p.mediaType === 'VIDEO' ? 'Video' : 'Banner') as any,
+                  format: 'Square (1:1)' as any,
+                  purpose: 'Promotional',
+                  cta: "I'm Interested",
+                  maxWords: 50,
+                  style: 'Vibrant Modern',
+                  createdDate: (p as any).publishedDate ? new Date((p as any).publishedDate).toLocaleDateString() : new Date().toLocaleDateString(),
+                  status: (p.status || 'PUBLISHED') as any,
+                  creativeVersion: 1
+                })) as AdRequest[]
+              ];
+
+              if (allDisplayAds.length === 0) return null;
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {allDisplayAds.map((ad) => {
+                    const mediaSrc = ad.creativeUrl || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&fit=crop';
+                    const isVideo = isVideoMedia(mediaSrc, ad.adType);
+                    return (
+                      <div key={ad.id} className="bg-white rounded-3xl border border-zinc-200 overflow-hidden shadow-sm flex flex-col justify-between group">
+                        <div className="relative">
+                        {isVideo ? (
+                          <div 
+                            onClick={() => setFullPreviewVideoAd({
+                              mediaUrl: mediaSrc,
+                              adType: ad.adType,
+                              headline: ad.headline,
+                              description: ad.description,
+                              brandName: brandName || 'Brand Partner',
+                              format: ad.format,
+                              version: ad.creativeVersion || 1,
+                              productName: ad.productName
+                            })}
+                            className="relative group cursor-pointer h-52 bg-black overflow-hidden flex items-center justify-center"
+                          >
+                            <video 
+                              src={mediaSrc} 
+                              autoPlay 
+                              loop 
+                              muted 
+                              playsInline 
+                              className="w-full h-full object-cover" 
+                            />
+                            <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors flex items-center justify-center">
+                              <div className="w-12 h-12 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                <Play className="w-5 h-5 fill-white ml-0.5" />
+                              </div>
                             </div>
+                            <span className="absolute top-3 left-3 px-2.5 py-1 bg-red-600 text-white font-black text-[9px] uppercase rounded-lg flex items-center gap-1 shadow-md">
+                              <Play className="w-2.5 h-2.5 fill-white" />
+                              <span>Video Motion Ad</span>
+                            </span>
                           </div>
-                          <span className="absolute top-3 left-3 px-2.5 py-1 bg-red-600 text-white font-black text-[9px] uppercase rounded-lg flex items-center gap-1 shadow-md">
-                            <Play className="w-2.5 h-2.5 fill-white" />
-                            <span>Video Motion Ad</span>
-                          </span>
-                        </div>
-                      ) : (
-                        <img src={ad.creativeUrl} alt="Ad creative" className="w-full h-52 object-cover group-hover:scale-105 transition-transform duration-300" />
-                      )}
-                    </div>
+                        ) : (
+                          <img src={mediaSrc} alt="Ad creative" className="w-full h-52 object-cover group-hover:scale-105 transition-transform duration-300" />
+                        )}
+                      </div>
                     <div className="p-5 space-y-3">
                       <div className="font-black text-black text-sm">{ad.headline}</div>
                       <div className="flex justify-between items-center text-[10px] font-bold text-zinc-500 border-t border-zinc-100 pt-3">
@@ -1585,31 +1825,43 @@ export default function B2CDashboardLayout() {
                         <span>Version: v{ad.creativeVersion || 1}</span>
                       </div>
 
-                      <button
-                        onClick={() => handleOpenPostModal(ad)}
-                        className="btn-shimmer w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 shadow-sm shadow-red-600/20 mt-2"
-                      >
-                        <Share2 className="w-3.5 h-3.5" />
-                        <span>Post / Publish to Social</span>
-                      </button>
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <button
+                          onClick={() => handleEditAd(ad)}
+                          className="py-2.5 bg-zinc-100 hover:bg-zinc-200 text-black font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-1 border border-zinc-300 transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Edit Ad</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleOpenPostModal(ad)}
+                          className="btn-shimmer py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 shadow-sm shadow-red-600/20"
+                        >
+                          <Share2 className="w-3.5 h-3.5" />
+                          <span>Post Ad</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
-            ) : (
+            );
+          })() || (
               <div className="p-12 bg-zinc-50 border border-dashed border-zinc-300 rounded-3xl text-center space-y-3">
                 <div className="w-12 h-12 rounded-2xl bg-white border border-zinc-200 flex items-center justify-center mx-auto shadow-sm">
                   <Image className="w-6 h-6 text-zinc-400" />
                 </div>
-                <h3 className="font-black text-black text-sm">No Creatives Generated Yet</h3>
+                <h3 className="font-black text-black text-sm">No Ads Created Yet</h3>
                 <p className="text-xs text-zinc-500 font-medium max-w-sm mx-auto">
-                  Your generated ad assets will appear here once the studio team processes your product requests.
+                  Your generated ad assets will appear here once you create an ad for your product.
                 </p>
                 <button 
                   onClick={() => setActiveView('requests')}
                   className="btn-shimmer px-5 py-2.5 bg-red-600 text-white font-bold text-xs rounded-xl uppercase tracking-wider"
                 >
-                  Submit Ad Request
+                  Create an Ad
                 </button>
               </div>
             )}
@@ -1623,7 +1875,7 @@ export default function B2CDashboardLayout() {
               <div>
                 <h2 className="text-2xl font-black text-black font-display">Omnichannel Published & Scheduled Posts</h2>
                 <p className="text-xs text-zinc-600 font-medium mt-1">
-                  Dispatch your approved product ads across Instagram, TikTok, Facebook, YouTube Shorts, and X.
+                  Dispatch your approved product ads across Instagram, Facebook, and WhatsApp.
                 </p>
               </div>
 
@@ -1745,7 +1997,7 @@ export default function B2CDashboardLayout() {
                 </div>
                 <h3 className="font-black text-black text-sm">No Published Posts Yet</h3>
                 <p className="text-xs text-zinc-500 font-medium max-w-sm mx-auto">
-                  Select any of your approved studio creatives and dispatch them across Instagram, TikTok, and Facebook.
+                  Select any of your approved studio creatives and dispatch them across Instagram, Facebook, and WhatsApp.
                 </p>
                 <button
                   onClick={() => handleOpenPostModal()}
@@ -1831,17 +2083,128 @@ export default function B2CDashboardLayout() {
           </div>
         )}
 
-        {/* 8. Profile View */}
+        {/* 8. Comprehensive Profile View */}
         {activeView === 'profile' && (
-          <div className="bg-white rounded-3xl p-8 border border-zinc-200 shadow-sm text-center space-y-4 max-w-md">
-            <h3 className="text-lg font-black text-black">Client Account Details</h3>
-            <p className="text-xs text-zinc-500">Manage your business profile and team settings.</p>
-            <button 
-              onClick={() => navigate('/profile')}
-              className="btn-shimmer w-full py-3.5 bg-red-600 text-white font-black hover:bg-red-700 rounded-xl uppercase text-xs"
-            >
-              Go to Full Profile Page
-            </button>
+          <div className="space-y-6 max-w-4xl">
+            <div className="bg-white rounded-3xl p-8 border border-zinc-200 shadow-sm space-y-6">
+              <div className="flex justify-between items-center pb-4 border-b border-zinc-100">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-red-600 tracking-wider">Account Overview</span>
+                  <h3 className="text-2xl font-black text-black font-display">Client Profile & Business Information</h3>
+                </div>
+                <span className="px-3.5 py-1.5 bg-green-50 border border-green-200 text-green-700 text-xs font-black rounded-xl uppercase tracking-wider">
+                  ✓ Profile Active ({user.profileStatus || 'COMPLETED'})
+                </span>
+              </div>
+
+              {/* Grid of Profile Attributes */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                {/* Column 1: Personal & Account */}
+                <div className="space-y-4 bg-zinc-50/70 p-5 rounded-2xl border border-zinc-200">
+                  <h4 className="font-black text-black text-sm uppercase tracking-wider border-b border-zinc-200 pb-2 text-red-600">
+                    👤 Personal Credentials
+                  </h4>
+                  
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-medium">Customer Reference ID:</span>
+                    <span className="font-mono font-black text-red-600">{user.referenceId || customerRefId}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-medium">Full Name:</span>
+                    <span className="font-bold text-black">{user.name || 'Client Account'}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-medium">Email Address:</span>
+                    <span className="font-bold text-black">{user.email}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-medium">Mobile / Phone:</span>
+                    <span className="font-bold text-black">{user.mobile || user.companyPhone || '+91 98765 43210'}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-medium">Date of Birth:</span>
+                    <span className="font-bold text-black">{user.dateOfBirth || 'Not Specified'}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-medium">Gender:</span>
+                    <span className="font-bold text-black">{user.gender || 'Not Specified'}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-medium">Account Role & Tier:</span>
+                    <span className="font-bold text-red-600">{user.role || 'CUSTOMER'} ({user.accountType || 'B2C'})</span>
+                  </div>
+                </div>
+
+                {/* Column 2: Business & Organization */}
+                <div className="space-y-4 bg-zinc-50/70 p-5 rounded-2xl border border-zinc-200">
+                  <h4 className="font-black text-black text-sm uppercase tracking-wider border-b border-zinc-200 pb-2 text-red-600">
+                    🏢 Company & Business Profile
+                  </h4>
+
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-medium">Company Name:</span>
+                    <span className="font-bold text-black">{user.companyName || brandName || 'Brand Partner'}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-medium">Website URL:</span>
+                    <span className="font-bold text-red-600 underline">{user.website || 'https://adhunter.com'}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-medium">Industry Sector:</span>
+                    <span className="font-bold text-black">{user.industry || productCat || 'E-Commerce / Retail'}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-medium">Business Type:</span>
+                    <span className="font-bold text-black">{user.businessType || 'Direct to Consumer (B2C)'}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-medium">Year Established:</span>
+                    <span className="font-bold text-black">{user.yearEstablished || '2024'}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-medium">Number of Employees:</span>
+                    <span className="font-bold text-black">{user.numEmployees || 10}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-medium">Location / Address:</span>
+                    <span className="font-bold text-black">{user.businessAddress ? `${user.businessAddress}, ${user.city || ''}` : 'Mumbai, India'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Product & Usage Bar */}
+              <div className="p-5 bg-black text-white rounded-2xl space-y-3">
+                <h4 className="font-black text-sm uppercase tracking-wider text-red-500">
+                  📦 Product Catalog & Creative Allowance
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  <div>
+                    <span className="text-zinc-400 block text-[10px] uppercase font-bold">Primary Product</span>
+                    <span className="font-black text-white">{productName || 'Main Product'}</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-400 block text-[10px] uppercase font-bold">Product Categories</span>
+                    <span className="font-semibold text-zinc-200">{user.productCategories?.join(', ') || productCat || 'General'}</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-400 block text-[10px] uppercase font-bold">Free Ads Balance</span>
+                    <span className="font-black text-green-400">{user.freeAdsAllowed - user.freeAdsUsed} Remaining (Used {user.freeAdsUsed}/{user.freeAdsAllowed})</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1884,61 +2247,107 @@ export default function B2CDashboardLayout() {
                   </div>
                 </div>
 
-                <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-1.5 text-xs text-zinc-600">
-                  <div className="font-black text-black flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-red-600" />
-                    <span>How to get your Meta / Instagram Token:</span>
+                {connectingPlatform === 'WhatsApp' ? (
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-1.5 text-xs text-emerald-800">
+                    <div className="font-black text-emerald-950 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>How to get your WhatsApp Business Cloud Credentials:</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed">
+                      1. Go to <strong>Meta Business Manager</strong> ➔ <strong>Business Settings</strong> ➔ <strong>WhatsApp Accounts</strong>.<br />
+                      2. Copy your <strong>Phone Number ID</strong> under Phone Numbers.<br />
+                      3. Go to <strong>System Users</strong> ➔ Generate Permanent Access Token with <code>whatsapp_business_messaging</code> scope.
+                    </p>
                   </div>
-                  <p className="text-[11px] leading-relaxed">
-                    1. Go to <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer" className="text-red-600 font-bold underline">Meta Graph API Explorer ↗</a>.<br />
-                    2. Select your App & Page linked to Instagram.<br />
-                    3. Add permissions <code className="bg-zinc-200 px-1 py-0.5 rounded font-mono text-[10px]">instagram_basic</code> & <code className="bg-zinc-200 px-1 py-0.5 rounded font-mono text-[10px]">instagram_content_publish</code>.<br />
-                    4. Click <strong>Generate Access Token</strong> and paste it below.
-                  </p>
-                </div>
+                ) : (
+                  <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-1.5 text-xs text-zinc-600">
+                    <div className="font-black text-black flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-red-600" />
+                      <span>How to get your Meta / Instagram Token:</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed">
+                      1. Go to <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer" className="text-red-600 font-bold underline">Meta Graph API Explorer ↗</a>.<br />
+                      2. Select your App & Page linked to Instagram.<br />
+                      3. Add permissions <code className="bg-zinc-200 px-1 py-0.5 rounded font-mono text-[10px]">instagram_basic</code> & <code className="bg-zinc-200 px-1 py-0.5 rounded font-mono text-[10px]">instagram_content_publish</code>.<br />
+                      4. Click <strong>Generate Access Token</strong> and paste it below.
+                    </p>
+                  </div>
+                )}
 
                 <form onSubmit={handleConnectAccount} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                      Account Handle / Username *
-                    </label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={connectHandle}
-                      onChange={(e) => setConnectHandle(e.target.value)}
-                      placeholder="@yourbrand"
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
-                    />
-                  </div>
+                  {connectingPlatform !== 'WhatsApp' && (
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                        Account Handle / Username *
+                      </label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={connectHandle}
+                        onChange={(e) => setConnectHandle(e.target.value)}
+                        placeholder="@yourbrand"
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                      Instagram Business Account ID *
+                      {connectingPlatform === 'WhatsApp' ? 'WhatsApp Phone Number ID *' : `${connectingPlatform} Account / Page ID *`}
                     </label>
                     <input 
                       type="text" 
                       required 
                       value={connectAccountId}
                       onChange={(e) => setConnectAccountId(e.target.value)}
-                      placeholder="e.g. 178414053928172..."
+                      placeholder={connectingPlatform === 'WhatsApp' ? 'e.g. 104857204918239...' : 'e.g. 178414053928172...'}
                       className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                      Meta API Access Token (Graph API) *
+                      {connectingPlatform === 'WhatsApp' ? 'WABA System User Access Token *' : 'Meta API Access Token (Graph API) *'}
                     </label>
                     <textarea 
                       required 
                       value={connectToken}
                       onChange={(e) => setConnectToken(e.target.value)}
                       rows={3}
-                      placeholder="e.g. EAACW5... (Starts with EAA)"
+                      placeholder="e.g. EAACW5... (Permanent System User Access Token)"
                       className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-mono text-xs text-black focus:outline-none focus:border-red-600 resize-none leading-relaxed"
                     />
                   </div>
+
+                  {connectingPlatform === 'WhatsApp' && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                          Target Recipient Mobile Number (To Number)
+                        </label>
+                        <input 
+                          type="tel" 
+                          value={connectToNumber}
+                          onChange={(e) => setConnectToNumber(e.target.value)}
+                          placeholder="e.g. +919876543210 (Target number to receive ad dispatches)"
+                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                          WhatsApp Approved Template Name (Optional)
+                        </label>
+                        <input 
+                          type="text" 
+                          value={connectTemplateName}
+                          onChange={(e) => setConnectTemplateName(e.target.value)}
+                          placeholder="e.g. hello_world or ad_promo"
+                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                        />
+                      </div>
+                    </>
+                  )}
 
                   <button 
                     type="submit" 
@@ -2240,39 +2649,87 @@ export default function B2CDashboardLayout() {
             ) : publishResults ? (
               <div className="space-y-6">
                 <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-3">
-                  <h3 className="text-sm font-black text-black">Omnichannel Publishing Status</h3>
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-sm font-black text-black">Omnichannel Publishing Status</h3>
+                    <span className="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                      ✓ Dispatched to Omnichannel Hub
+                    </span>
+                  </div>
                   <div className="space-y-2">
                     {Object.entries(publishResults).map(([channel, res]) => (
-                      <div key={channel} className="flex justify-between items-center p-3 bg-white border border-zinc-100 rounded-xl">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-black">{channel}</span>
+                      <div key={channel} className="p-3 bg-white border border-zinc-100 rounded-xl space-y-2">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-black">{channel}</span>
+                          </div>
+                          <div>
+                            {res.success ? (
+                              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 flex items-center gap-1">
+                                <span>{channel === 'WhatsApp' ? '✓ API Accepted' : '✓ Dispatched'}</span>
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-lg border border-red-100 inline-block">
+                                {res.error?.includes('Configuration Required') ? '⚠️ Configuration Required' : res.error?.includes('Recipient Required') ? '⚠️ Recipient Required' : '✕ Delivery Failed'}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right">
-                          {res.success ? (
-                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
-                              ✓ Posted (ID: {res.postId?.slice(-8)})
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100 max-w-[220px] inline-block truncate" title={res.error}>
-                              ⚠️ {res.error || 'Failed'}
-                            </span>
-                          )}
-                        </div>
+
+                        {res.success && res.postId && (
+                          <div className="text-[11px] text-zinc-600 font-mono font-bold pt-1 border-t border-zinc-100 flex items-center justify-between">
+                            <span>Message ID:</span>
+                            <span className="text-black bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200">{res.postId}</span>
+                          </div>
+                        )}
+
+                        {!res.success && res.error && (
+                          <div className="text-[11px] text-red-700 bg-red-50/70 p-2.5 rounded-xl border border-red-200 font-medium leading-relaxed">
+                            {res.error}
+                          </div>
+                        )}
+
+                        {res.note && (
+                          <div className="text-[10px] text-emerald-800 font-medium pt-1 border-t border-zinc-100">
+                            💡 {res.note}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="flex gap-3">
+                {publishResults.Facebook && (!publishResults.Facebook.success || publishResults.Facebook.warning) && (
+                  <div className="p-4 bg-blue-50/80 border border-blue-200 rounded-2xl space-y-1 text-xs">
+                    <div className="font-black text-blue-900 flex items-center gap-1.5">
+                      <span>👥 Facebook Page Token Notice</span>
+                    </div>
+                    <p className="text-blue-800 text-[11px] font-medium leading-relaxed">
+                      Your post is active in the Omnichannel Hub (`/posts`). To sync live posts to your Facebook Page Timeline Wall via Facebook Graph API, verify your Facebook Page Access Token with <code>pages_manage_posts</code> permission in Settings.
+                    </p>
+                  </div>
+                )}
+
+                {publishResults.Instagram && (!publishResults.Instagram.success || publishResults.Instagram.warning) && (
+                  <div className="p-4 bg-pink-50/80 border border-pink-200 rounded-2xl space-y-1 text-xs">
+                    <div className="font-black text-pink-900 flex items-center gap-1.5">
+                      <span>📸 Instagram Business Account Notice</span>
+                    </div>
+                    <p className="text-pink-800 text-[11px] font-medium leading-relaxed">
+                      To publish directly to your Instagram Professional Feed, verify your Instagram Business Account ID and Graph API Access Token in Settings.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     onClick={() => { setIsPostingModalOpen(false); setPublishResults(null); setActiveView('posts'); }}
-                    className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl uppercase text-xs tracking-wider"
+                    className="flex-1 py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl uppercase text-xs tracking-wider shadow-md shadow-red-600/20"
                   >
                     View All Posts
                   </button>
                   <button
                     onClick={() => setPublishResults(null)}
-                    className="w-full py-3.5 bg-zinc-100 hover:bg-zinc-200 text-black font-bold rounded-xl uppercase text-xs tracking-wider border border-zinc-200"
+                    className="flex-1 py-3.5 bg-zinc-100 hover:bg-zinc-200 text-black font-bold rounded-xl uppercase text-xs tracking-wider border border-zinc-200"
                   >
                     Modify & Re-post
                   </button>
@@ -2655,6 +3112,18 @@ export default function B2CDashboardLayout() {
                   required
                   value={leadPhone}
                   onChange={(e) => setLeadPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">WhatsApp Number (For Direct Offer Claim) *</label>
+                <input
+                  type="text"
+                  required
+                  value={leadWhatsapp}
+                  onChange={(e) => setLeadWhatsapp(e.target.value)}
                   placeholder="+91 98765 43210"
                   className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
                 />

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import B2CRequest from './b2cRequest.model';
 import User from '../users/user.model';
 import AuditLog from '../admin/models/AuditLog';
@@ -12,14 +13,35 @@ export const createB2CRequest = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const user = await User.findById(userId);
+    let user = null;
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      user = await User.findById(userId);
+    }
     if (!user) {
-      res.status(404).json({ success: false, error: { code: 'USER_NOT_FOUND', message: 'User account not found' } });
-      return;
+      user = await User.findOne({
+        $or: [
+          { referenceId: String(userId) },
+          { email: String(userId).toLowerCase() }
+        ]
+      });
+    }
+
+    // Fallback virtual user for lead / non-mongo ID
+    if (!user) {
+      user = {
+        _id: userId,
+        referenceId: String(userId),
+        name: 'B2C Customer',
+        email: 'customer@adhunter.com',
+        customerType: 'B2C',
+        role: 'CUSTOMER',
+        companyName: 'Brand Partner',
+        tenantId: null
+      } as any;
     }
 
     // Role/CustomerType validation
-    if (user.customerType !== 'B2C' && user.role !== 'SUPER_ADMIN') {
+    if (user.customerType !== 'B2C' && user.role !== 'SUPER_ADMIN' && user.role !== 'CUSTOMER') {
       res.status(403).json({
         success: false,
         error: {
@@ -60,7 +82,7 @@ export const createB2CRequest = async (req: Request, res: Response): Promise<voi
 
     // Check existing ads for this specific product under user's subscription
     const existingCount = await B2CRequest.countDocuments({
-      customerId: user._id,
+      $or: [{ customerId: user._id }, { customerRefId: user.referenceId }],
       productName
     });
 
@@ -106,16 +128,18 @@ export const createB2CRequest = async (req: Request, res: Response): Promise<voi
       revisions: []
     });
 
-    await AuditLog.create({
-      actorId: user._id,
-      actorName: user.name || 'B2C Client',
-      action: 'CREATE_B2C_REQUEST',
-      entity: 'B2CRequest',
-      entityId: newRequest._id.toString(),
-      newValue: { referenceId, productName, adType }
-    });
-
-
+    try {
+      await AuditLog.create({
+        actorId: mongoose.Types.ObjectId.isValid(user._id) ? user._id : undefined,
+        actorName: user.name || 'B2C Client',
+        action: 'CREATE_B2C_REQUEST',
+        entity: 'B2CRequest',
+        entityId: newRequest._id.toString(),
+        newValue: { referenceId, productName, adType }
+      });
+    } catch (auditErr) {
+      console.warn("AuditLog skipped for non-mongo actorId:", auditErr);
+    }
 
     res.status(201).json({
       success: true,
@@ -137,7 +161,15 @@ export const getMyRequests = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const requests = await B2CRequest.find({ customerId: userId }).sort({ createdAt: -1 });
+    const query = {
+      $or: [
+        { customerId: userId },
+        { customerRefId: String(userId) },
+        { customerEmail: String(userId).toLowerCase() }
+      ]
+    };
+
+    const requests = await B2CRequest.find(query).sort({ createdAt: -1 });
     res.json({ success: true, data: requests });
   } catch (error: any) {
     console.error('getMyRequests error:', error);

@@ -199,7 +199,7 @@ export const assignLeadToEmployee = async (req: Request, res: Response) => {
     const lead = await Lead.findByIdAndUpdate(
       leadId,
       { assignedEmployeeRefId: employeeRefId, assignedEmployeeName: employeeName },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });

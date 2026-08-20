@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendPasswordResetSuccessEmail = exports.sendPasswordResetOtpEmail = void 0;
+exports.sendInquiryNotificationEmail = exports.sendPasswordResetSuccessEmail = exports.sendPasswordResetOtpEmail = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 // Helper to get configured nodemailer transporter
 const getTransporter = () => {
@@ -189,4 +189,84 @@ const sendPasswordResetSuccessEmail = async (toEmail, userName) => {
     }
 };
 exports.sendPasswordResetSuccessEmail = sendPasswordResetSuccessEmail;
+const sendInquiryNotificationEmail = async (inquiryData) => {
+    const adminEmail = (process.env.ADMIN_EMAIL || process.env.SMTP_USER || process.env.EMAIL_USER || 'admin@adhunter.com').trim();
+    const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER;
+    const fromEmail = (smtpUser && smtpUser.includes('@gmail.com'))
+        ? `AD-HUNTER Inquiry <${smtpUser}>`
+        : (process.env.FROM_EMAIL || 'AD-HUNTER Inquiry <no-reply@adhunter.ai>');
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, sans-serif; background-color: #f4f4f5; padding: 20px; color: #18181b; }
+          .container { max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 20px; border: 1px solid #e4e4e7; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
+          .header { background: #09090b; padding: 28px; text-align: center; color: #ffffff; }
+          .title { font-size: 22px; font-weight: 900; }
+          .title-red { color: #dc2626; }
+          .subtitle { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #a1a1aa; font-weight: 700; margin-top: 4px; }
+          .content { padding: 28px; }
+          .field { margin-bottom: 16px; border-bottom: 1px solid #f4f4f5; padding-bottom: 12px; }
+          .label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #dc2626; letter-spacing: 1.5px; }
+          .val { font-size: 14px; font-weight: 800; color: #09090b; margin-top: 4px; }
+          .msg-box { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 12px; padding: 16px; margin-top: 16px; }
+          .footer { background: #fafafa; border-top: 1px solid #f4f4f5; padding: 16px; text-align: center; font-size: 11px; color: #a1a1aa; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="title">AD<span class="title-red">HUNTER</span></div>
+            <div class="subtitle">⚡ Transmitted Customer Inquiry Alert</div>
+          </div>
+          <div class="content">
+            <div class="field">
+              <div class="label">Customer Full Name</div>
+              <div class="val">${inquiryData.name}</div>
+            </div>
+            <div class="field">
+              <div class="label">Email Address</div>
+              <div class="val">${inquiryData.email}</div>
+            </div>
+            ${inquiryData.phone ? `<div class="field"><div class="label">Phone Number</div><div class="val">${inquiryData.phone}</div></div>` : ''}
+            ${inquiryData.whatsapp ? `<div class="field"><div class="label">WhatsApp Number</div><div class="val">${inquiryData.whatsapp}</div></div>` : ''}
+            ${inquiryData.company ? `<div class="field"><div class="label">Company Name</div><div class="val">${inquiryData.company}</div></div>` : ''}
+            ${inquiryData.inquiryType ? `<div class="field"><div class="label">Inquiry Topic</div><div class="val">${inquiryData.inquiryType}</div></div>` : ''}
+            ${inquiryData.source ? `<div class="field"><div class="label">Source</div><div class="val">${inquiryData.source}</div></div>` : ''}
+            ${inquiryData.message ? `
+              <div class="msg-box">
+                <div class="label" style="margin-bottom: 6px;">Inquiry Message Text</div>
+                <div style="font-size: 13px; font-weight: 600; color: #18181b; line-height: 1.6;">${inquiryData.message}</div>
+              </div>
+            ` : ''}
+          </div>
+          <div class="footer">
+            Automated transmission notification • Sent to Admin (${adminEmail})
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+    try {
+        const transporter = getTransporter();
+        if (transporter) {
+            await transporter.sendMail({
+                from: fromEmail,
+                to: adminEmail,
+                subject: `📩 Transmitted Inquiry from ${inquiryData.name} (${inquiryData.email})`,
+                html: htmlContent
+            });
+            console.log(`[Mail Service] Inquiry notification email transmitted to admin (${adminEmail}) successfully.`);
+            return { success: true };
+        }
+    }
+    catch (err) {
+        console.error('[Mail Service] Inquiry notification mail error:', err);
+        return { success: false, error: err.message };
+    }
+    return { success: true };
+};
+exports.sendInquiryNotificationEmail = sendInquiryNotificationEmail;
 //# sourceMappingURL=mail.service.js.map

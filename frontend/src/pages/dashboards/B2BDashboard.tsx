@@ -69,7 +69,7 @@ export interface B2BLead {
 }
 
 export interface SocialAccountCredential {
-  platform: 'Instagram' | 'Facebook' | 'TikTok' | 'YouTube' | 'Twitter';
+  platform: 'Instagram' | 'Facebook' | 'WhatsApp';
   handle: string;
   accountId: string;
   accessToken: string;
@@ -101,9 +101,7 @@ export const B2B_VIDEO_PRESETS = [
 const SOCIAL_CHANNELS = [
   { id: 'Instagram' as const, name: 'Instagram', badge: '📷 Instagram', color: 'bg-pink-50 text-pink-600 border-pink-200' },
   { id: 'Facebook' as const, name: 'Facebook', badge: '👥 Facebook', color: 'bg-blue-50 text-blue-600 border-blue-200' },
-  { id: 'TikTok' as const, name: 'TikTok', badge: '🎵 TikTok', color: 'bg-zinc-100 text-black border-zinc-300' },
-  { id: 'YouTube' as const, name: 'YouTube Shorts', badge: '🔴 YouTube Shorts', color: 'bg-red-50 text-red-600 border-red-200' },
-  { id: 'Twitter' as const, name: 'X / Twitter', badge: '✖️ X / Twitter', color: 'bg-zinc-100 text-zinc-800 border-zinc-300' }
+  { id: 'WhatsApp' as const, name: 'WhatsApp', badge: '💬 WhatsApp', color: 'bg-emerald-50 text-emerald-600 border-emerald-200' }
 ];
 
 export default function B2BDashboard() {
@@ -151,6 +149,10 @@ export default function B2BDashboard() {
   const [activeView, setActiveView] = useState<
     'overview' | 'products' | 'campaigns' | 'posts' | 'social' | 'leads' | 'employees' | 'profile'
   >('overview');
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeView]);
 
   // B2B Employee / Team State
   const [b2bEmployees, setB2BEmployees] = useState<any[]>([]);
@@ -467,7 +469,25 @@ export default function B2BDashboard() {
       return;
     }
     setIsPublishing(true);
-    const resolvedMediaUrl = postMediaUrl || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&fit=crop';
+    let resolvedMediaUrl = postMediaUrl || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&fit=crop';
+    
+    // Auto-convert base64 or local media URLs to public Cloudinary/CDN URL
+    if (resolvedMediaUrl.startsWith('data:image') || resolvedMediaUrl.startsWith('data:video') || resolvedMediaUrl.includes('localhost')) {
+      try {
+        const cdnRes = await fetch('http://localhost:3000/api/upload/base64', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: resolvedMediaUrl })
+        });
+        const cdnData = await cdnRes.json();
+        if (cdnData.url && cdnData.url.startsWith('http') && !cdnData.url.includes('localhost')) {
+          resolvedMediaUrl = cdnData.url;
+        }
+      } catch (cdnErr) {
+        console.warn("CDN media conversion notice:", cdnErr);
+      }
+    }
+
     try {
       const res = await fetch('http://localhost:3000/api/social/publish', {
         method: 'POST',

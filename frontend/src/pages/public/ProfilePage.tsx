@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { setCredentials } from '../../features/auth/authSlice';
 import { COUNTRY_CODES, getCountryRule } from '../auth/Join';
+import { validateName, validatePhoneDigits } from '../../utils/validationUtils';
 
 export default function ProfilePage() {
   const { user } = useSelector((state: any) => state.auth);
@@ -27,14 +28,27 @@ export default function ProfilePage() {
   const [personalCountryCode, setPersonalCountryCode] = useState(user?.countryCode || '+91');
   const [mobile, setMobile] = useState((user?.mobile || user?.phone || '').replace(/^\+\d+\s*/, ''));
   const [selectedType, setSelectedType] = useState<'EXPLORER' | 'B2B' | 'B2C'>(currentCustomerType);
+  const [dateOfBirth, setDateOfBirth] = useState(user?.dateOfBirth || '');
+  const [gender, setGender] = useState(user?.gender || 'Not Specified');
+
+  // Validation States
+  const [nameErr, setNameErr] = useState('');
+  const [phoneErr, setPhoneErr] = useState('');
 
   // Business / Company Form Fields
   const [companyName, setCompanyName] = useState(user?.companyName || '');
+  const [companyEmail, setCompanyEmail] = useState(user?.companyEmail || user?.email || '');
   const [industry, setIndustry] = useState(user?.industry || 'E-Commerce');
   const [website, setWebsite] = useState(user?.website || '');
   const [businessCountryCode, setBusinessCountryCode] = useState('+91');
   const [businessPhone, setBusinessPhone] = useState((user?.companyPhone || user?.mobile || '').replace(/^\+\d+\s*/, ''));
   const [description, setDescription] = useState(user?.description || '');
+  const [businessType, setBusinessType] = useState(user?.businessType || 'Direct to Consumer (B2C)');
+  const [yearEstablished, setYearEstablished] = useState(user?.yearEstablished || '2024');
+  const [numEmployees, setNumEmployees] = useState(user?.numEmployees || 10);
+  const [businessAddress, setBusinessAddress] = useState(user?.businessAddress || '');
+  const [city, setCity] = useState(user?.city || 'Mumbai');
+  const [state, setState] = useState(user?.state || 'Maharashtra');
   const productCategory = Array.isArray(user?.productCategories) ? user.productCategories[0] || 'Footwear' : (user?.productCategories || 'Footwear');
 
 
@@ -106,17 +120,14 @@ export default function ProfilePage() {
   const handleSavePersonal = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Transition Legality Check
-    if (currentCustomerType === 'B2B' && selectedType !== 'B2B') {
-      alert("Error: Account type is permanently locked to B2B and cannot be altered.");
-      return;
-    }
-    if (currentCustomerType === 'B2C' && selectedType !== 'B2C') {
-      alert("Error: Account type is permanently locked to B2C and cannot be altered.");
-      return;
-    }
+    const nameVal = validateName(name);
+    setNameErr(nameVal.error);
 
-    if (mobile && !validatePhone(mobile, personalCountryCode, "Mobile phone number")) {
+    const rule = getCountryRule(personalCountryCode);
+    const phoneVal = validatePhoneDigits(mobile, rule.minLength || rule.length || 8, rule.maxLength || rule.length || 11);
+    setPhoneErr(phoneVal.error);
+
+    if (!nameVal.isValid || (mobile && !phoneVal.isValid)) {
       return;
     }
 
@@ -138,7 +149,9 @@ export default function ProfilePage() {
       countryCode: personalCountryCode,
       customerType: updatedCustomerType,
       accountType: updatedCustomerType,
-      role: updatedRole
+      role: updatedRole,
+      dateOfBirth,
+      gender
     };
 
     // Update Redux state immediately
@@ -171,10 +184,17 @@ export default function ProfilePage() {
     const updatedUser = {
       ...user,
       companyName,
+      companyEmail,
       industry,
       website,
       companyPhone: formattedBusinessPhone,
       description,
+      businessType,
+      yearEstablished,
+      numEmployees,
+      businessAddress,
+      city,
+      state,
       productCategories: [productCategory],
       mainProduct: {
         name: companyName || 'Flagship Product',
@@ -347,8 +367,8 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              {/* Personal Details Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Personal & Business Details Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
                   <span className="text-[10px] font-black uppercase text-zinc-400 block mb-1">Full Name</span>
                   <span className="text-sm font-black text-black">{name}</span>
@@ -365,8 +385,48 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
-                  <span className="text-[10px] font-black uppercase text-zinc-400 block mb-1">Subscription Status</span>
-                  <span className="text-sm font-black text-red-600 uppercase">{user.paymentStatus || 'UNPAID'}</span>
+                  <span className="text-[10px] font-black uppercase text-zinc-400 block mb-1">Date of Birth</span>
+                  <span className="text-sm font-black text-black">{dateOfBirth || 'Not Specified'}</span>
+                </div>
+
+                <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
+                  <span className="text-[10px] font-black uppercase text-zinc-400 block mb-1">Gender</span>
+                  <span className="text-sm font-black text-black">{gender}</span>
+                </div>
+
+                <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
+                  <span className="text-[10px] font-black uppercase text-zinc-400 block mb-1">Company Name</span>
+                  <span className="text-sm font-black text-black">{companyName || 'N/A'}</span>
+                </div>
+
+                <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
+                  <span className="text-[10px] font-black uppercase text-zinc-400 block mb-1">Business Website</span>
+                  <span className="text-sm font-black text-red-600 truncate block">{website || 'N/A'}</span>
+                </div>
+
+                <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
+                  <span className="text-[10px] font-black uppercase text-zinc-400 block mb-1">Industry Sector</span>
+                  <span className="text-sm font-black text-black">{industry}</span>
+                </div>
+
+                <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
+                  <span className="text-[10px] font-black uppercase text-zinc-400 block mb-1">Business Type</span>
+                  <span className="text-sm font-black text-black">{businessType}</span>
+                </div>
+
+                <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
+                  <span className="text-[10px] font-black uppercase text-zinc-400 block mb-1">Year Established</span>
+                  <span className="text-sm font-black text-black">{yearEstablished}</span>
+                </div>
+
+                <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
+                  <span className="text-[10px] font-black uppercase text-zinc-400 block mb-1">Number of Employees</span>
+                  <span className="text-sm font-black text-black">{numEmployees}</span>
+                </div>
+
+                <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl">
+                  <span className="text-[10px] font-black uppercase text-zinc-400 block mb-1">Business Address</span>
+                  <span className="text-sm font-black text-black">{businessAddress ? `${businessAddress}, ${city}, ${state}` : `${city}, ${state}`}</span>
                 </div>
               </div>
 
@@ -435,16 +495,25 @@ export default function ProfilePage() {
               </div>
 
               {/* Form Input Fields */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Full Name *</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Full Name (Letters Only) *</label>
                   <input
                     type="text"
                     required
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                    onChange={(e) => {
+                      const cleaned = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                      setName(cleaned);
+                      setNameErr(validateName(cleaned).error);
+                    }}
+                    className={`w-full px-4 py-3 bg-zinc-50 border rounded-xl font-bold text-xs text-black focus:outline-none ${
+                      nameErr ? 'border-red-600 ring-1 ring-red-600' : 'border-zinc-300 focus:border-red-600'
+                    }`}
                   />
+                  {nameErr && (
+                    <p className="text-[11px] font-bold text-red-600 mt-1">⚠️ {nameErr}</p>
+                  )}
                 </div>
 
                 <div>
@@ -458,29 +527,150 @@ export default function ProfilePage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Mobile Phone *</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Mobile Phone (Numbers Only)</label>
                   <div className="flex gap-2">
                     <select
                       value={personalCountryCode}
-                      onChange={e => setPersonalCountryCode(e.target.value)}
+                      onChange={(e) => setPersonalCountryCode(e.target.value)}
                       className="px-3 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600 w-28"
                     >
-                      {COUNTRY_CODES.map(c => (
+                      {COUNTRY_CODES.map((c) => (
                         <option key={c.code} value={c.code}>
                           {c.flag} {c.code}
                         </option>
                       ))}
                     </select>
-                    <input
-                      type="tel"
-                      required
-                      value={mobile}
-                      maxLength={getCountryRule(personalCountryCode).maxLength || getCountryRule(personalCountryCode).length}
-                      onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))}
-                      className="flex-1 px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
-                      placeholder={getCountryRule(personalCountryCode).placeholder}
-                    />
+                    <div className="flex-1">
+                      <input
+                        type="tel"
+                        value={mobile}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, '');
+                          setMobile(digits);
+                          const rule = getCountryRule(personalCountryCode);
+                          setPhoneErr(validatePhoneDigits(digits, rule.minLength || rule.length || 8, rule.maxLength || rule.length || 11).error);
+                        }}
+                        className={`w-full px-4 py-3 bg-zinc-50 border rounded-xl font-bold text-xs text-black focus:outline-none ${
+                          phoneErr ? 'border-red-600 ring-1 ring-red-600' : 'border-zinc-300 focus:border-red-600'
+                        }`}
+                        placeholder={getCountryRule(personalCountryCode).placeholder}
+                      />
+                      {phoneErr && (
+                        <p className="text-[11px] font-bold text-red-600 mt-1">⚠️ {phoneErr}</p>
+                      )}
+                    </div>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Date of Birth</label>
+                  <input
+                    type="date"
+                    value={dateOfBirth}
+                    onChange={(e) => setDateOfBirth(e.target.value)}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Gender</label>
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Company Name</label>
+                  <input
+                    type="text"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="e.g. Velocity Athletics"
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Company Email</label>
+                  <input
+                    type="email"
+                    value={companyEmail}
+                    onChange={(e) => setCompanyEmail(e.target.value)}
+                    placeholder="contact@company.com"
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Business Type</label>
+                  <input
+                    type="text"
+                    value={businessType}
+                    onChange={(e) => setBusinessType(e.target.value)}
+                    placeholder="e.g. Direct to Consumer (B2C)"
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Year Established</label>
+                  <input
+                    type="text"
+                    value={yearEstablished}
+                    onChange={(e) => setYearEstablished(e.target.value)}
+                    placeholder="2024"
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Number of Employees</label>
+                  <input
+                    type="number"
+                    value={numEmployees}
+                    onChange={(e) => setNumEmployees(Number(e.target.value))}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">Business Address</label>
+                  <input
+                    type="text"
+                    value={businessAddress}
+                    onChange={(e) => setBusinessAddress(e.target.value)}
+                    placeholder="Street / Office Address"
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">City</label>
+                  <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="Mumbai"
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">State / Region</label>
+                  <input
+                    type="text"
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
+                    placeholder="Maharashtra"
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                  />
                 </div>
               </div>
 

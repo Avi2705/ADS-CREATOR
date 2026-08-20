@@ -4,6 +4,9 @@ import { useDispatch } from 'react-redux';
 import { ArrowLeft } from 'lucide-react';
 import { setCredentials } from '../../features/auth/authSlice';
 
+import { sanitizeName, validateName, sanitizePhone, validatePhoneDigits, validateEmail } from '../../utils/validationUtils';
+import { LOCATION_DATA, CATEGORY_OPTIONS } from '../../constants/locationAndCategoryData';
+
 export const COUNTRY_CODES = [
   { code: '+91', country: 'India', flag: '🇮🇳', length: 10, placeholder: '10-digit mobile number' },
   { code: '+1', country: 'USA / Canada', flag: '🇺🇸', length: 10, placeholder: '10-digit phone number' },
@@ -33,35 +36,37 @@ export default function Join() {
   const [countryCode, setCountryCode] = useState('+91');
   const [phone, setPhone] = useState('');
 
+  // Field Errors
+  const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+
   // Form State - Step 2: Company / Business Info
   const [companyName, setCompanyName] = useState('');
-  const [companyEmail, setCompanyEmail] = useState('');
-  const [companyCountryCode, setCompanyCountryCode] = useState('+91');
-  const [companyPhone, setCompanyPhone] = useState('');
   const [website, setWebsite] = useState('');
-  const companyCountry = 'India';
-  const [state, setState] = useState('');
-  const [city, setCity] = useState('');
+  const [state, setState] = useState('Maharashtra');
+  const [city, setCity] = useState('Mumbai');
   const businessAddress = '';
   const [businessType, setBusinessType] = useState('Individual');
-  const [industry, setIndustry] = useState('');
+  const [industry, setIndustry] = useState('Education');
   const [yearEstablished, setYearEstablished] = useState('');
   const numEmployees = 1;
   const [numProducts] = useState(1);
-  const [productCategories, setProductCategories] = useState('');
+  const [productCategories, setProductCategories] = useState('Education');
   const [description, setDescription] = useState('');
   const [experience, setExperience] = useState('0-1 Years');
 
-  // Form State Constants (previously step 3 & 4 choice values)
-  const intentType = 'Explorer';
+  // Form State Constants
+  const companyCountry = country;
+  const intentType = 'EXPLORER';
   const b2bExpectedUsers = 1;
   const b2bAdChannels: string[] = [];
   const b2bSocialPlatforms: string[] = [];
   const b2bMainRequirement = '';
   const b2bExpectedUsage = 'Daily';
   const b2bAdProblems = '';
-  const b2cProdName = '';
-  const b2cProdCategory = '';
+  const b2cProdName = 'Flagship Product';
+  const b2cProdCategory = 'General';
   const b2cProdWebsite = '';
   const b2cAdMethod = '';
   const b2cAdTypes: string[] = [];
@@ -73,45 +78,53 @@ export default function Join() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const validatePhoneNumber = (rawPhone: string, code: string, fieldName: string): boolean => {
-    if (!rawPhone.trim()) return true;
-    const digitsOnly = rawPhone.replace(/\D/g, '');
-    if (rawPhone !== digitsOnly) {
-      alert(`${fieldName} must contain only numbers (no letters or symbols).`);
-      return false;
-    }
-    const rule = getCountryRule(code);
-    if (rule.minLength && rule.maxLength) {
-      if (digitsOnly.length < rule.minLength || digitsOnly.length > rule.maxLength) {
-        alert(`For ${rule.country} (${rule.code}), ${fieldName.toLowerCase()} must be between ${rule.minLength} and ${rule.maxLength} digits. You entered ${digitsOnly.length} digits.`);
-        return false;
-      }
-    } else if (rule.length) {
-      if (digitsOnly.length !== rule.length) {
-        alert(`For ${rule.country} (${rule.code}), ${fieldName.toLowerCase()} must be exactly ${rule.length} digits. You entered ${digitsOnly.length} digits.`);
-        return false;
-      }
-    }
-    return true;
+  const handleCountrySelect = (newCountry: string) => {
+    setCountry(newCountry);
+    const states = Object.keys(LOCATION_DATA[newCountry] || {});
+    const firstState = states[0] || '';
+    setState(firstState);
+    const cities = LOCATION_DATA[newCountry]?.[firstState] || [];
+    setCity(cities[0] || '');
+  };
+
+  const handleStateSelect = (newState: string) => {
+    setState(newState);
+    const cities = LOCATION_DATA[country]?.[newState] || [];
+    setCity(cities[0] || '');
   };
 
   const validateStep1 = () => {
-    if (!name || !email || !password || !confirmPassword || !phone) {
-      alert("Please fill in all required (*) personal details.");
+    const nameVal = validateName(name);
+    setNameError(nameVal.error);
+
+    const emailVal = validateEmail(email);
+    setEmailError(emailVal.error);
+
+    const rule = getCountryRule(countryCode);
+    const phoneVal = validatePhoneDigits(phone, rule.minLength || rule.length || 8, rule.maxLength || rule.length || 11);
+    setPhoneError(phoneVal.error);
+
+    if (!nameVal.isValid || !emailVal.isValid || !phoneVal.isValid) {
       return false;
     }
+
+    if (!password || !confirmPassword) {
+      alert("Password fields are required.");
+      return false;
+    }
+
     if (password !== confirmPassword) {
       alert("Passwords do not match.");
       return false;
     }
-    // Password Strength Check
+
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
     if (!passwordRegex.test(password)) {
       alert("Password must be at least 8 characters long and contain at least one uppercase letter, one number, and one special character.");
       return false;
     }
-    // Validate phone number against country rule
-    return validatePhoneNumber(phone, countryCode, "Contact phone number");
+
+    return true;
   };
 
   const handleNextStep = (e: React.FormEvent) => {
@@ -119,11 +132,8 @@ export default function Join() {
     if (step === 1) {
       if (validateStep1()) setStep(2);
     } else if (step === 2) {
-      if (!companyName || !businessType || !industry || !productCategories || !description) {
+      if (!companyName || !businessType || !industry || !productCategories) {
         alert("Please fill in all required (*) business details.");
-        return;
-      }
-      if (companyPhone && !validatePhoneNumber(companyPhone, companyCountryCode, "Company phone number")) {
         return;
       }
       registerUser('COMPLETED');
@@ -142,8 +152,8 @@ export default function Join() {
       intentType,
       // Company info
       companyName,
-      companyEmail,
-      companyPhone: companyPhone ? `${companyCountryCode} ${companyPhone}` : '',
+      companyEmail: email,
+      companyPhone: `${countryCode} ${phone}`,
       website,
       companyCountry,
       state,
@@ -321,19 +331,52 @@ export default function Join() {
 
         {/* Step 1: Personal Details */}
         {step === 1 && (
-          <form onSubmit={handleNextStep} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleNextStep} className="space-y-4" noValidate>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Full Name *</label>
-                <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm" placeholder="John Doe" />
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Full Name (Letters Only) *</label>
+                <input 
+                  type="text" 
+                  required 
+                  value={name} 
+                  onChange={e => {
+                    const cleaned = sanitizeName(e.target.value);
+                    setName(cleaned);
+                    setNameError(validateName(cleaned).error);
+                  }} 
+                  className={`w-full p-3 bg-zinc-50 border rounded-xl font-bold text-black focus:outline-none text-sm ${
+                    nameError ? 'border-red-600 ring-1 ring-red-600' : 'border-zinc-300 focus:border-red-600'
+                  }`} 
+                  placeholder="John Doe" 
+                />
+                {nameError && (
+                  <p className="text-[11px] font-bold text-red-600 mt-1">⚠️ {nameError}</p>
+                )}
               </div>
+
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Email Address *</label>
-                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm" placeholder="john@example.com" />
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Work Email (Strict TLD Check) *</label>
+                <input 
+                  type="email" 
+                  required 
+                  value={email} 
+                  onChange={e => {
+                    const val = e.target.value;
+                    setEmail(val);
+                    setEmailError(validateEmail(val).error);
+                  }} 
+                  className={`w-full p-3 bg-zinc-50 border rounded-xl font-bold text-black focus:outline-none text-sm ${
+                    emailError ? 'border-red-600 ring-1 ring-red-600' : 'border-zinc-300 focus:border-red-600'
+                  }`} 
+                  placeholder="john@company.com" 
+                />
+                {emailError && (
+                  <p className="text-[11px] font-bold text-red-600 mt-1">⚠️ {emailError}</p>
+                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Password *</label>
                 <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm" placeholder="••••••••" />
@@ -344,13 +387,53 @@ export default function Join() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Country *</label>
-              <input type="text" required value={country} onChange={e => setCountry(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm" placeholder="India" />
+            {/* Cascading Location Selection */}
+            <div className="p-3.5 bg-zinc-50 rounded-xl border border-zinc-200 space-y-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">📍 Select Location (Country ➔ State ➔ City) *</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-zinc-500 mb-1">Country</label>
+                  <select
+                    value={country}
+                    onChange={e => handleCountrySelect(e.target.value)}
+                    className="w-full p-2.5 bg-white border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                  >
+                    {Object.keys(LOCATION_DATA).map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-zinc-500 mb-1">State / Region</label>
+                  <select
+                    value={state}
+                    onChange={e => handleStateSelect(e.target.value)}
+                    className="w-full p-2.5 bg-white border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                  >
+                    {Object.keys(LOCATION_DATA[country] || {}).map(st => (
+                      <option key={st} value={st}>{st}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-zinc-500 mb-1">City</label>
+                  <select
+                    value={city}
+                    onChange={e => setCity(e.target.value)}
+                    className="w-full p-2.5 bg-white border border-zinc-300 rounded-xl font-bold text-xs text-black focus:outline-none focus:border-red-600"
+                  >
+                    {(LOCATION_DATA[country]?.[state] || []).map(ct => (
+                      <option key={ct} value={ct}>{ct}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Contact Phone *</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Contact Phone (Numbers Only) *</label>
               <div className="flex gap-2">
                 <select 
                   value={countryCode} 
@@ -363,15 +446,27 @@ export default function Join() {
                     </option>
                   ))}
                 </select>
-                <input 
-                  type="tel" 
-                  required 
-                  value={phone} 
-                  onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} 
-                  maxLength={getCountryRule(countryCode).maxLength || getCountryRule(countryCode).length}
-                  className="flex-1 p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm" 
-                  placeholder={getCountryRule(countryCode).placeholder} 
-                />
+                <div className="flex-1">
+                  <input 
+                    type="tel" 
+                    required 
+                    value={phone} 
+                    onChange={e => {
+                      const digits = sanitizePhone(e.target.value);
+                      setPhone(digits);
+                      const rule = getCountryRule(countryCode);
+                      setPhoneError(validatePhoneDigits(digits, rule.minLength || rule.length || 8, rule.maxLength || rule.length || 11).error);
+                    }} 
+                    maxLength={getCountryRule(countryCode).maxLength || getCountryRule(countryCode).length}
+                    className={`w-full p-3 bg-zinc-50 border rounded-xl font-bold text-black focus:outline-none text-sm ${
+                      phoneError ? 'border-red-600 ring-1 ring-red-600' : 'border-zinc-300 focus:border-red-600'
+                    }`} 
+                    placeholder={getCountryRule(countryCode).placeholder} 
+                  />
+                  {phoneError && (
+                    <p className="text-[11px] font-bold text-red-600 mt-1">⚠️ {phoneError}</p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -405,43 +500,16 @@ export default function Join() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Company Email</label>
-                <input type="email" value={companyEmail} onChange={e => setCompanyEmail(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm" placeholder="corp@acme.com" />
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Industry Category *</label>
+                <select value={industry} onChange={e => { setIndustry(e.target.value); setProductCategories(e.target.value); }} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm">
+                  {CATEGORY_OPTIONS.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Company Phone</label>
-                <div className="flex gap-2">
-                  <select 
-                    value={companyCountryCode} 
-                    onChange={e => setCompanyCountryCode(e.target.value)} 
-                    className="p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 w-32 text-xs"
-                  >
-                    {COUNTRY_CODES.map(c => (
-                      <option key={c.code} value={c.code}>
-                        {c.flag} {c.code}
-                      </option>
-                    ))}
-                  </select>
-                  <input 
-                    type="tel" 
-                    value={companyPhone} 
-                    onChange={e => setCompanyPhone(e.target.value.replace(/\D/g, ''))} 
-                    maxLength={getCountryRule(companyCountryCode).maxLength || getCountryRule(companyCountryCode).length}
-                    className="flex-1 p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm" 
-                    placeholder={getCountryRule(companyCountryCode).placeholder} 
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Website</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Company Website</label>
                 <input type="text" value={website} onChange={e => setWebsite(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm" placeholder="www.acme.com" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Industry *</label>
-                <input type="text" required value={industry} onChange={e => setIndustry(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm" placeholder="E-commerce, Apparel" />
               </div>
             </div>
 
@@ -460,13 +528,35 @@ export default function Join() {
               </div>
             </div>
 
+            {/* Targeted Audience Checkboxes */}
+            <div className="p-3.5 bg-zinc-50 rounded-xl border border-zinc-200 space-y-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">🎯 Targeted Audience Groups</label>
+              <div className="grid grid-cols-2 gap-2">
+                {['Students', 'Home Maker', 'IT Professionals', 'Business Owners / Entrepreneurs', 'Healthcare Professionals', 'Working Professionals', 'Senior Citizens', 'Others'].map(target => (
+                  <label key={target} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-zinc-200 text-xs font-bold text-black cursor-pointer hover:border-red-600">
+                    <input
+                      type="checkbox"
+                      defaultChecked={target === 'Students' || target === 'IT Professionals'}
+                      className="w-3.5 h-3.5 text-red-600 rounded border-zinc-300 focus:ring-red-500 cursor-pointer"
+                    />
+                    <span className="truncate text-[11px]">{target}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Product Categories *</label>
-                <input type="text" required value={productCategories} onChange={e => setProductCategories(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm" placeholder="Electronics, Gadgets" />
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Simplified Ad Type</label>
+                <select value={productCategories} onChange={e => setProductCategories(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none focus:border-red-600 text-sm">
+                  <option value="B2C Creative Banner">B2C Creative Banner</option>
+                  <option value="B2B Commercial Ad">B2B Commercial Ad</option>
+                  <option value="Social Promotion">Social Promotion</option>
+                  <option value="Product Launch">Product Launch</option>
+                </select>
               </div>
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Experience</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">Experience Level</label>
                 <select value={experience} onChange={e => setExperience(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl font-bold text-black focus:outline-none text-sm">
                   <option value="0-1 Years">0-1 Years</option>
                   <option value="1-3 Years">1-3 Years</option>
